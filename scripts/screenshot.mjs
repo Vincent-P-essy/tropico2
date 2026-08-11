@@ -64,6 +64,16 @@ try {
   await page.goto(`http://localhost:${port}/?seed=${seed}`, { waitUntil: "domcontentloaded" });
   await page.waitForFunction("window.tropico !== undefined", { timeout: 20000 });
 
+  // The game opens on a start screen unless the URL names an episode. Go through
+  // it rather than around it, so this harness exercises the path a player takes.
+  const menu = await page.$("#start");
+  if (menu) {
+    await page.evaluate(() => {
+      document.querySelector("#start .primary")?.click();
+    });
+    await page.waitForFunction("document.getElementById('start') === null", { timeout: 10000 });
+  }
+
   // Play the island forward with the clock paused, so the run is deterministic
   // and does not depend on how fast the machine renders.
   await page.evaluate((ticks) => {

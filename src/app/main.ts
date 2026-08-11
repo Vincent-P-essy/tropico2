@@ -19,6 +19,7 @@ import {
 } from "../sim/state.ts";
 import type { GameState } from "../sim/types.ts";
 import { EdictsPanel } from "../ui/edicts-panel.ts";
+import { recordMedal, StartScreen } from "../ui/start-screen.ts";
 import { FleetPanel } from "../ui/fleet-panel.ts";
 import { Hud, type Selection } from "../ui/hud.ts";
 import { buildShip, crewShip, launch, loadShip, recall, recruitCaptain } from "../sim/fleet.ts";
@@ -48,7 +49,12 @@ if (!context) throw new Error("this browser has no 2d canvas");
 const ctx: CanvasRenderingContext2D = context;
 
 const seed = readSeed();
-const state: GameState = startingGame(seed);
+/**
+ * Reassigned when the player picks from the start screen. The game boots with a
+ * valid island either way, so nothing below has to cope with there being no
+ * world yet — the screen simply sits over a paused one.
+ */
+let state: GameState = startingGame(seed);
 const atlas = buildAtlas();
 const camera = new Camera();
 
@@ -161,9 +167,30 @@ const edicts = new EdictsPanel(edictRoot, {
   },
 });
 
-// Open on the settlement rather than a corner of the sea.
-const start = findStartSite(state.island, 9);
-camera.lookAt(start.x + 4, start.y + 4);
+/** Points the camera at the settlement rather than a corner of the sea. */
+function lookAtSettlement(): void {
+  const site = findStartSite(state.island, 9);
+  camera.lookAt(site.x + 4, site.y + 4);
+}
+lookAtSettlement();
+
+/*
+ * The start screen. Skipped when the URL already says what to play, so a direct
+ * link and the headless harness both land straight in the game.
+ */
+const chosenByUrl = new URLSearchParams(window.location.search).has("episode");
+if (!chosenByUrl) {
+  speedIndex = 0;
+  const startRoot = document.createElement("div");
+  document.body.append(startRoot);
+  new StartScreen(startRoot, seed, (choice) => {
+    state = choice.scenario
+      ? startScenario(choice.scenario, choice.seed, choice.king)
+      : newGame({ seed: choice.seed, islandSize: 64, king: choice.king });
+    lookAtSettlement();
+    speedIndex = 1;
+  });
+}
 
 resize();
 window.addEventListener("resize", resize);
@@ -325,6 +352,10 @@ function frame(now: number): void {
     hovered: hover ?? undefined,
     ghost: picked && hover ? { def: picked, x: hover.x, y: hover.y, valid: ghostValid } : undefined,
   });
+
+  if (state.status === "won" && state.medal && state.scenario) {
+    recordMedal(state.scenario.id, state.medal);
+  }
 
   hud.update(state, selection);
   fleet.update(state);
