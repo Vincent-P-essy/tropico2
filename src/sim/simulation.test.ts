@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { TICKS_PER_DAY, TICKS_PER_MONTH } from "../data/balance.ts";
+import { BUILDINGS } from "../data/buildings.ts";
 import {
   assignToBuilding,
   autoAssign,
@@ -20,10 +21,9 @@ import {
 } from "./game.ts";
 import { decayNeeds, moodTarget, satisfyNeed, spawnCaptive, spawnPirate } from "./people.ts";
 import { diagnose, findService, serviceQuality } from "./services.ts";
-import { newGame } from "./setup.ts";
+import { mainComponent, newGame } from "./setup.ts";
 import { addBuilding, canPlace, createState, finishedBuildings } from "./state.ts";
 import { passable } from "./behaviour.ts";
-import { floodFill } from "../core/path.ts";
 import { idx, rectPerimeter } from "../core/grid.ts";
 import type { Building, GameState } from "./types.ts";
 
@@ -563,6 +563,40 @@ describe("placement rules", () => {
     expect(canPlace(fresh, "cigarFactory", 10, 10).ok).toBe(true);
   });
 
+  it("swaps the footprint when a building is turned", () => {
+    const fresh = createState({ seed: 18, islandSize: 40 });
+    fresh.island.terrain.fill(3);
+    fresh.lumber = 500;
+    addBuilding(fresh, "road", 10, 9, { instant: true });
+
+    // A sawmill is six by four; turned, it is four by six.
+    const upright = addBuilding(fresh, "sawmill", 10, 10, { instant: true });
+    expect([upright.w, upright.h]).toEqual([6, 4]);
+    const turned = addBuilding(fresh, "sawmill", 20, 20, { instant: true, rotation: 1 });
+    expect([turned.w, turned.h]).toEqual([4, 6]);
+  });
+
+  it("occupies the turned tiles, not the original ones", () => {
+    const fresh = createState({ seed: 18, islandSize: 40 });
+    fresh.island.terrain.fill(3);
+    const turned = addBuilding(fresh, "sawmill", 10, 10, { instant: true, rotation: 1 });
+    // Four wide and six deep: the far corner of the upright footprint is free.
+    expect(fresh.occupancy.get(13, 15)).toBe(turned.id);
+    expect(fresh.occupancy.get(15, 11)).toBe(-1);
+  });
+
+  it("lets a turned building fit a gap the upright one cannot", () => {
+    const fresh = createState({ seed: 19, islandSize: 40 });
+    fresh.island.terrain.fill(3);
+    fresh.lumber = 500;
+    addBuilding(fresh, "road", 10, 9, { instant: true });
+    // Wall off the ground a six-wide building would need.
+    for (let y = 10; y < 18; y++) addBuilding(fresh, "scaryDecor", 15, y, { instant: true });
+
+    expect(canPlace(fresh, "sawmill", 10, 10, 0).ok).toBe(false);
+    expect(canPlace(fresh, "sawmill", 10, 10, 1).ok).toBe(true);
+  });
+
   it("refuses what you cannot afford, and says how short you are", () => {
     const fresh = createState({ seed: 17, islandSize: 40 });
     fresh.island.terrain.fill(3);
@@ -583,9 +617,12 @@ describe("running a whole island", () => {
     // with nothing on screen to explain why.
     for (const seed of [1650, 4242, 909, 21, 55, 77, 33, 8080]) {
       const state = flatGame({ seed });
-      const stockade = find(state, "stockade");
-      const origin = { x: (stockade?.x ?? 24) - 1, y: stockade?.y ?? 24 };
-      const reached = floodFill(state.island, (x, y) => passable(state, x, y), [origin]);
+      // From the island's main walkable area, not from one chosen door: a big
+      // building leaves single-tile nooks along its wall, and a flood that
+      // starts in one of those measures a world one tile across.
+      const reached = mainComponent(state);
+      expect(reached, `seed ${seed}: nowhere to walk at all`).not.toBeNull();
+      if (!reached) continue;
 
       for (const building of state.buildings.values()) {
         if (building.def === "road") continue;
@@ -596,6 +633,29 @@ describe("running a whole island", () => {
           `seed ${seed}: ${building.def} at ${building.x},${building.y} is unreachable`,
         ).toBe(true);
       }
+    }
+  });
+
+  it("gives nearly every pirate a bed, and puts somebody behind every bar", () => {
+    // Two silent killers, both of which look like nothing on screen. A pirate
+    // with no plot has resting and stashing pinned at zero from the first hour;
+    // an unstaffed tavern is a shed, and a band with every tavern shut is
+    // miserable in a town that appears to have everything. Both once ran at
+    // roughly one in twelve without a single line in the log to say so.
+    for (const seed of [1650, 4242, 909, 21, 55, 77, 33, 8080]) {
+      const state = flatGame({ seed });
+      const band = [...state.people.values()].filter((p) => p.kind === "pirate");
+      const homed = band.filter((p) => p.home >= 0).length;
+      expect(homed / band.length, `seed ${seed}: pirates with a plot`).toBeGreaterThanOrEqual(0.6);
+
+      tickMany(state, TICKS_PER_DAY * 30 * 6);
+      const bars = [...state.buildings.values()].filter(
+        (b) => BUILDINGS[b.def].provides !== undefined && BUILDINGS[b.def].staff !== undefined,
+      );
+      const open = bars.filter((b) => b.workers.length > 0).length;
+      expect(open / Math.max(1, bars.length), `seed ${seed}: services with staff`).toBeGreaterThan(
+        0.7,
+      );
     }
   });
 

@@ -47,6 +47,7 @@ describe("emissionAt", () => {
     y: 10,
     w: 3,
     h: 3,
+    rotation: 0,
     construction: 0,
     constructionTotal: 0,
     workers: [],

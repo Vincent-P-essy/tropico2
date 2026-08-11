@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { BUILDINGS } from "../data/buildings.ts";
 import { TICKS_PER_DAY, TICKS_PER_MONTH } from "../data/balance.ts";
 import { EDICT_IDS } from "../data/edicts.ts";
 import { auraModifiers } from "./auras.ts";
@@ -29,13 +30,19 @@ function island(seed = 4242, treasury = 50_000): GameState {
   return state;
 }
 
-/** Puts a finished building on the map wherever there is room for it. */
+/**
+ * Puts a finished building on the map wherever there is room for it.
+ *
+ * Room means the building's own footprint and a tile of margin — not a clear
+ * ten-by-ten square, which the opening settlement now fills up completely.
+ */
 function plant(state: GameState, def: Parameters<typeof addBuilding>[1]): number {
-  for (let y = 2; y < state.island.height - 12; y++) {
-    for (let x = 2; x < state.island.width - 12; x++) {
+  const { w, h } = BUILDINGS[def];
+  for (let y = 2; y < state.island.height - h - 2; y++) {
+    for (let x = 2; x < state.island.width - w - 2; x++) {
       let clear = true;
-      for (let dy = 0; dy < 10 && clear; dy++) {
-        for (let dx = 0; dx < 10 && clear; dx++) {
+      for (let dy = -1; dy < h + 1 && clear; dy++) {
+        for (let dx = -1; dx < w + 1 && clear; dx++) {
           if (state.occupancy.get(x + dx, y + dy) >= 0) clear = false;
           if (state.island.terrain.get(x + dx, y + dy) < 2) clear = false;
         }
