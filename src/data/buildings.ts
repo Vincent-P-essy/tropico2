@@ -295,7 +295,6 @@ export const BUILDINGS: Readonly<Record<BuildingId, BuildingDef>> = {
     auras: [
       { aura: "order", strength: 69, radius: 3 },
       { aura: "defense", strength: 27, radius: 3 },
-      { aura: "awe", strength: 30, radius: 4 },
     ],
     description:
       "Your seat, and it grows with your hoard. Palace guards are the only pirates who can be sent to assassinate someone.",
@@ -1472,20 +1471,27 @@ export const HOUSING_LEVELS: readonly HousingLevel[] = [
   },
 ];
 
-/** The Pirate Palace grows with the hoard; four levels, each stronger than the last. */
 export interface PalaceLevel {
   readonly name: string;
   readonly hoard: number;
   readonly order: number;
   readonly defense: number;
-  readonly awe: number;
 }
 
+/**
+ * The palace grows with the hoard. Order and defense are the original's exact
+ * figures; the hoard thresholds are not published anywhere and are chosen so the
+ * four levels span a campaign.
+ *
+ * It emits no awe. Only the fort, the parrot aviary and pirate housing do — a
+ * detail worth keeping, because it means the way to impress your captives is to
+ * let your pirates get rich.
+ */
 export const PALACE_LEVELS: readonly PalaceLevel[] = [
-  { name: "Pirate Palace", hoard: 0, order: 69, defense: 27, awe: 30 },
-  { name: "Grand Palace", hoard: 2500, order: 73, defense: 39, awe: 42 },
-  { name: "Royal Palace", hoard: 7500, order: 76, defense: 51, awe: 54 },
-  { name: "Palace of the Pirate King", hoard: 15000, order: 80, defense: 63, awe: 66 },
+  { name: "Pirate Palace", hoard: 0, order: 69, defense: 27 },
+  { name: "Grand Palace", hoard: 2500, order: 73, defense: 39 },
+  { name: "Royal Palace", hoard: 7500, order: 76, defense: 51 },
+  { name: "Palace of the Pirate King", hoard: 15000, order: 80, defense: 63 },
 ];
 
 /** Lifetime earnings needed for each pirate rank, and what the rank is called. */

@@ -60,7 +60,6 @@ export function emissionsOf(building: Building): readonly AuraEmission[] {
     return [
       { aura: "order", strength: level.order, radius: 3 },
       { aura: "defense", strength: level.defense, radius: 3 },
-      { aura: "awe", strength: level.awe, radius: 4 },
     ];
   }
 

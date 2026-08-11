@@ -84,6 +84,13 @@ from the game's own data rather than reinvented:
 - **16 campaign episodes**, 1650–1747, with their start dates, starting
   resources, objectives and bronze/silver/gold time thresholds.
 
+[`src/data/fidelity.test.ts`](src/data/fidelity.test.ts) pins all of it: the
+ship table, every captain's stat line, every published aura strength and radius,
+every footprint, the Black Market and Smuggler's Cove price lists, the rank
+thresholds, and all sixteen episodes' dates and deadlines. It is separate from
+the coherence tests on purpose — it is the thing to run after any balance work
+to be sure a tuning pass has not quietly rewritten the game into something else.
+
 Not reproduced: the original's art and audio, and its per-tick balance curves,
 which were never published. The numbers in
 [`src/data/balance.ts`](src/data/balance.ts) are tuned to reproduce its
@@ -139,7 +146,7 @@ that was painting a third of the island black got caught._
 ```bash
 npm install
 npm run dev          # play it at localhost:5173
-npm test             # 301 tests, no browser needed
+npm test             # 324 tests, no browser needed
 npm run typecheck
 npm run lint
 npm run screenshot   # boots the real game headless and photographs it
