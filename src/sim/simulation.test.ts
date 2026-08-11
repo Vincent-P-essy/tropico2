@@ -19,11 +19,19 @@ import {
   receiveGold,
   tickMany,
 } from "./game.ts";
-import { decayNeeds, moodTarget, satisfyNeed, spawnCaptive, spawnPirate } from "./people.ts";
+import {
+  decayNeeds,
+  killPerson,
+  moodTarget,
+  satisfyNeed,
+  spawnCaptive,
+  spawnPirate,
+} from "./people.ts";
 import { diagnose, findService, serviceQuality } from "./services.ts";
 import { mainComponent, newGame } from "./setup.ts";
-import { addBuilding, canPlace, createState, finishedBuildings } from "./state.ts";
+import { addBuilding, canPlace, createState, finishedBuildings, removeBuilding } from "./state.ts";
 import { passable } from "./behaviour.ts";
+import { checkInvasion } from "./unrest.ts";
 import { idx, rectPerimeter } from "../core/grid.ts";
 import type { Building, GameState } from "./types.ts";
 
@@ -606,6 +614,66 @@ describe("placement rules", () => {
     const check = canPlace(fresh, "stockade", 10, 10);
     expect(check.ok).toBe(false);
     expect(check.reason).toMatch(/lumber|gold/);
+  });
+});
+
+describe("the powers coming for you", () => {
+  // The whole point of relations, forts and the patron edict. Every piece of
+  // this existed and nothing ever called it, so three nations could spend a
+  // decade at war with the haven without one sail appearing on the horizon.
+
+  /** A haven that England knows the way to and has every reason to burn. */
+  function hunted(seed = 5): GameState {
+    const state = newGame({ seed, islandSize: 40 });
+    state.nations.england.knowsLocation = true;
+    state.nations.england.relations = -95;
+    return state;
+  }
+
+  it("sends a squadron against a haven it can find and hates", () => {
+    const state = hunted();
+    let seen = false;
+    for (let month = 0; month < 60 && !seen; month++) {
+      checkInvasion(state);
+      seen = state.notices.some((n) => n.text.includes("squadron"));
+    }
+    expect(seen, "sixty months of open war and nobody sailed").toBe(true);
+  });
+
+  it("leaves alone a haven that nobody can find", () => {
+    const state = hunted();
+    state.nations.england.knowsLocation = false;
+    for (let month = 0; month < 60; month++) checkInvasion(state);
+    expect(state.notices.some((n) => n.text.includes("squadron"))).toBe(false);
+  });
+
+  it("leaves alone a haven under somebody's protection", () => {
+    const state = hunted();
+    state.nations.france.isPatron = true;
+    for (let month = 0; month < 60; month++) checkInvasion(state);
+    expect(state.notices.some((n) => n.text.includes("squadron"))).toBe(false);
+  });
+
+  it("does not come for a haven that has kept its head down", () => {
+    // An ordinary game, played badly but quietly, must never see a sail: the
+    // powers only learn the way here through the player's own edicts.
+    const state = newGame({ seed: 1650, islandSize: 48 });
+    tickMany(state, TICKS_PER_MONTH * 18);
+    expect(state.notices.some((n) => n.text.includes("squadron"))).toBe(false);
+  });
+
+  it("burns down a haven with nothing at all to defend it", () => {
+    const state = hunted(9);
+    for (const building of [...state.buildings.values()]) {
+      if (BUILDINGS[building.def].auras?.some((a) => a.aura === "defense")) {
+        removeBuilding(state, building.id);
+      }
+    }
+    for (const person of [...state.people.values()]) {
+      if (person.kind === "pirate") killPerson(state, person, "gone");
+    }
+    for (let month = 0; month < 200 && state.status === "playing"; month++) checkInvasion(state);
+    expect(state.status).toBe("lost");
   });
 });
 

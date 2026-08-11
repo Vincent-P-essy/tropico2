@@ -8,7 +8,7 @@ import { HOUSING_LEVELS, PALACE_LEVELS } from "../data/buildings.ts";
 import { NATION_IDS, REGION_IDS } from "../data/nations.ts";
 import { updatePerson } from "./behaviour.ts";
 import { updateFleet } from "./fleet.ts";
-import { updateDiplomacy, updateUnrest } from "./unrest.ts";
+import { checkInvasion, updateDiplomacy, updateUnrest } from "./unrest.ts";
 import { checkScenario } from "./objectives.ts";
 import { updateEffects } from "./edicts.ts";
 import { relaxMarket } from "./trade.ts";
@@ -119,6 +119,9 @@ export function upgradePalace(state: GameState): void {
 function monthlyTick(state: GameState): void {
   payUpkeep(state);
   updateDiplomacy(state);
+  // Diplomacy first, so a month's healing counts before anybody sails: a nation
+  // that has just come round does not send a squadron on the same day.
+  checkInvasion(state);
   relaxMarket(state);
   checkScenario(state);
 
