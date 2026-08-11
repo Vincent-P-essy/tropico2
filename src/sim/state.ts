@@ -152,8 +152,11 @@ export function nextId(state: GameState): number {
   return state.nextId++;
 }
 
-export function footprintOf(def: BuildingDef, x: number, y: number): Rect {
-  return { x, y, w: def.w, h: def.h };
+export type Rotation = 0 | 1;
+
+/** The footprint a building would occupy, turned or not. */
+export function footprintOf(def: BuildingDef, x: number, y: number, rotation: Rotation = 0): Rect {
+  return rotation === 0 ? { x, y, w: def.w, h: def.h } : { x, y, w: def.h, h: def.w };
 }
 
 export function buildingAt(state: GameState, x: number, y: number): Building | undefined {
@@ -212,9 +215,10 @@ export function canPlace(
   defId: BuildingId,
   x: number,
   y: number,
+  rotation: Rotation = 0,
 ): PlacementCheck {
   const def = BUILDINGS[defId];
-  const rect = footprintOf(def, x, y);
+  const rect = footprintOf(def, x, y, rotation);
 
   if (def.unique && countBuildings(state, defId) > 0) {
     return { ok: false, reason: `Only one ${def.name} may stand on the island` };
@@ -317,19 +321,22 @@ export function addBuilding(
   defId: BuildingId,
   x: number,
   y: number,
-  options: { instant?: boolean; constructionHours?: number } = {},
+  options: { instant?: boolean; constructionHours?: number; rotation?: Rotation } = {},
 ): Building {
   const def = BUILDINGS[defId];
   const id = nextId(state);
   const hours = options.instant ? 0 : (options.constructionHours ?? 0);
+  const rotation = options.rotation ?? 0;
+  const rect = footprintOf(def, x, y, rotation);
 
   const building: Building = {
     id,
     def: defId,
     x,
     y,
-    w: def.w,
-    h: def.h,
+    w: rect.w,
+    h: rect.h,
+    rotation,
     construction: hours,
     constructionTotal: hours,
     workers: [],

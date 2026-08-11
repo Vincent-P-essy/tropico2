@@ -169,15 +169,21 @@ export const BUILDING_ART: Readonly<Record<BuildingId, ArtSpec>> = {
   graveyard: A("yard", ["graves", "cross"]),
 };
 
-/** Draws a building of the given type at the brush's origin. */
-export function drawBuilding(brush: Brush, id: BuildingId, level = 0): void {
+/**
+ * Draws a building of the given type at the brush's origin.
+ *
+ * A quarter turn is drawn by swapping the footprint the archetype is given,
+ * which is enough: a hall's ridge runs the other way, a pier's decking turns,
+ * and the door comes out on the other side.
+ */
+export function drawBuilding(brush: Brush, id: BuildingId, level = 0, rotation: 0 | 1 = 0): void {
   const def = BUILDINGS[id];
   const spec = BUILDING_ART[id];
   const style = CATEGORY_STYLE[def.category];
   const roof = spec.roof ?? style.roof;
   const wall = spec.wall ?? style.wall;
-  const w = def.w;
-  const h = def.h;
+  const w = rotation === 0 ? def.w : def.h;
+  const h = rotation === 0 ? def.h : def.w;
 
   switch (spec.archetype) {
     case "hut":

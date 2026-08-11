@@ -127,8 +127,15 @@ export interface Building {
   /** Top-left tile of the footprint. */
   x: number;
   y: number;
+  /** Footprint as placed, already accounting for rotation. */
   w: number;
   h: number;
+  /**
+   * A quarter turn, or not. The original let you turn a building so its hauler
+   * entrance faced the way you wanted; here it swaps the footprint, which is
+   * what actually decides whether a six-by-four will fit in the gap you have.
+   */
+  rotation: 0 | 1;
   /** Builder-hours still needed; 0 means finished. */
   construction: number;
   /** Total builder-hours the job started with, for the progress bar. */

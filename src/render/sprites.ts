@@ -29,10 +29,12 @@ function createCanvas(width: number, height: number): HTMLCanvasElement {
   return canvas;
 }
 
-/** Renders one building type at one level into a sprite. */
-function buildBuildingSprite(id: BuildingId, level: number): Sprite {
+/** Renders one building type at one level and orientation into a sprite. */
+function buildBuildingSprite(id: BuildingId, level: number, rotation: 0 | 1): Sprite {
   const def = BUILDINGS[id];
-  const bounds = footprintBounds(0, 0, def.w, def.h);
+  const w = rotation === 0 ? def.w : def.h;
+  const h = rotation === 0 ? def.h : def.w;
+  const bounds = footprintBounds(0, 0, w, h);
   // Room above for roofs, masts and flags, which reach well past the footprint.
   const headroom = 150;
   const width = bounds.right - bounds.left + PADDING * 2;
@@ -47,8 +49,8 @@ function buildBuildingSprite(id: BuildingId, level: number): Sprite {
 
   const brush: Brush = { ctx, originX: anchorX, originY: anchorY };
   ctx.save();
-  drawShadow(ctx, brush, def.w, def.h);
-  drawBuilding(brush, id, level);
+  drawShadow(ctx, brush, w, h);
+  drawBuilding(brush, id, level, rotation);
   ctx.restore();
 
   return { canvas, anchorX, anchorY };
@@ -147,20 +149,14 @@ export function buildAtlas(): SpriteAtlas {
   const buildings = new Map<string, Sprite>();
   for (const id of Object.keys(BUILDINGS) as BuildingId[]) {
     if (id === "road") continue;
-    if (id === "pirateHousing") {
-      // Housing has a distinct sprite per rank, from bare plot to mansion.
-      for (let level = 0; level < HOUSING_LEVELS.length; level++) {
-        buildings.set(`${id}:${level}`, buildBuildingSprite(id, level));
+    // Square buildings look the same either way round, so they get one sprite.
+    const rotations: (0 | 1)[] = BUILDINGS[id].w === BUILDINGS[id].h ? [0] : [0, 1];
+    const levels = id === "pirateHousing" ? HOUSING_LEVELS.length : id === "piratePalace" ? 4 : 1;
+    for (const rotation of rotations) {
+      for (let level = 0; level < levels; level++) {
+        buildings.set(`${id}:${level}:${rotation}`, buildBuildingSprite(id, level, rotation));
       }
-      continue;
     }
-    if (id === "piratePalace") {
-      for (let level = 0; level < 4; level++) {
-        buildings.set(`${id}:${level}`, buildBuildingSprite(id, level));
-      }
-      continue;
-    }
-    buildings.set(`${id}:0`, buildBuildingSprite(id, 0));
   }
 
   const terrain: Sprite[][] = [];
@@ -173,8 +169,17 @@ export function buildAtlas(): SpriteAtlas {
   return { buildings, terrain, road: buildRoadSprite() };
 }
 
-export function buildingSprite(atlas: SpriteAtlas, id: BuildingId, level = 0): Sprite | undefined {
-  return atlas.buildings.get(`${id}:${level}`) ?? atlas.buildings.get(`${id}:0`);
+export function buildingSprite(
+  atlas: SpriteAtlas,
+  id: BuildingId,
+  level = 0,
+  rotation: 0 | 1 = 0,
+): Sprite | undefined {
+  return (
+    atlas.buildings.get(`${id}:${level}:${rotation}`) ??
+    atlas.buildings.get(`${id}:0:${rotation}`) ??
+    atlas.buildings.get(`${id}:0:0`)
+  );
 }
 
 export function terrainSprite(atlas: SpriteAtlas, type: number, x: number, y: number): Sprite {

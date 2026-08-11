@@ -32,7 +32,7 @@ export type Overlay = "none" | "anarchy" | "order" | "fear" | "defense" | "awe" 
 
 export interface RenderOptions {
   /** Building being placed, drawn as a translucent ghost under the cursor. */
-  ghost?: { def: BuildingId; x: number; y: number; valid: boolean } | undefined;
+  ghost?: { def: BuildingId; x: number; y: number; valid: boolean; rotation: 0 | 1 } | undefined;
   overlay?: Overlay;
   selected?: number | undefined;
   hovered?: { x: number; y: number } | undefined;
@@ -312,7 +312,7 @@ function drawOneBuilding(
     return;
   }
 
-  const sprite = buildingSprite(atlas, building.def, building.level);
+  const sprite = buildingSprite(atlas, building.def, building.level, building.rotation);
   if (!sprite) return;
   ctx.drawImage(sprite.canvas, screen.x - sprite.anchorX, screen.y - sprite.anchorY);
 
@@ -497,9 +497,9 @@ function drawShip(
 function drawGhost(
   ctx: CanvasRenderingContext2D,
   atlas: SpriteAtlas,
-  ghost: { def: BuildingId; x: number; y: number; valid: boolean },
+  ghost: { def: BuildingId; x: number; y: number; valid: boolean; rotation: 0 | 1 },
 ): void {
-  const sprite = buildingSprite(atlas, ghost.def, 0);
+  const sprite = buildingSprite(atlas, ghost.def, 0, ghost.rotation);
   const screen = tileToScreen(ghost.x, ghost.y);
 
   ctx.save();
@@ -510,6 +510,8 @@ function drawGhost(
   ctx.restore();
 
   const def = BUILDINGS[ghost.def];
+  const gw = ghost.rotation === 0 ? def.w : def.h;
+  const gh = ghost.rotation === 0 ? def.h : def.w;
   const colour = ghost.valid ? UI.good : UI.bad;
   ctx.save();
   ctx.strokeStyle = colour;
@@ -518,9 +520,9 @@ function drawGhost(
   ctx.beginPath();
   const corners = [
     tileToScreen(ghost.x, ghost.y),
-    tileToScreen(ghost.x + def.w, ghost.y),
-    tileToScreen(ghost.x + def.w, ghost.y + def.h),
-    tileToScreen(ghost.x, ghost.y + def.h),
+    tileToScreen(ghost.x + gw, ghost.y),
+    tileToScreen(ghost.x + gw, ghost.y + gh),
+    tileToScreen(ghost.x, ghost.y + gh),
   ];
   corners.forEach((c, i) => {
     const x = c.x - HALF_W;
