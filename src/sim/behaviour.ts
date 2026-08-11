@@ -25,6 +25,7 @@ import {
   updateStarvation,
 } from "./people.ts";
 import { addStock, sourcesFor, stockCap, stockOf, takeStock, wantedGoods } from "./economy.ts";
+import { gamblingRig } from "./edicts.ts";
 import { findService, providedNeeds } from "./services.ts";
 import { isRoad } from "./state.ts";
 import type { Building, GameState, Person } from "./types.ts";
@@ -221,9 +222,13 @@ function leave(state: GameState, person: Person): void {
 function serve(state: GameState, person: Person, building: Building, hours: number): void {
   const provisions = providedNeeds(state, building);
   const fraction = Math.min(1, (hours / SERVICE_HOURS) * SERVICE_FILL);
+  const rig = gamblingRig(state);
   for (const provision of provisions) {
     if (!needsOf(person).includes(provision.need)) continue;
-    satisfyNeed(person, provision.need, provision.quality, fraction);
+    // Rigging the tables is felt exactly where you would expect: at the tables.
+    const quality =
+      provision.need === "gambling" ? provision.quality * rig.satisfaction : provision.quality;
+    satisfyNeed(person, provision.need, Math.min(100, quality), fraction);
   }
 
   // Eating consumes what was cooked. A chuck tent's slop is used up by the
@@ -238,7 +243,8 @@ function serve(state: GameState, person: Person, building: Building, hours: numb
   if (fee !== undefined && hours > 0) {
     // Pirates and wealthy captives pay for their pleasures, and the takings are
     // the island's second income after plunder.
-    const share = fee * (hours / SERVICE_HOURS);
+    const gambles = provisions.some((p) => p.need === "gambling");
+    const share = fee * (hours / SERVICE_HOURS) * (gambles ? rig.profit : 1);
     const paid = Math.min(person.gold, share);
     person.gold -= paid;
     state.treasury += paid;

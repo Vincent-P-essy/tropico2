@@ -147,9 +147,13 @@ export function kingEffects(king: King): TraitEffects[] {
 let modifierCache: { signature: string; value: AuraModifiers } | null = null;
 
 function modifierSignature(state: GameState): string {
-  return `${state.king.background}|${state.king.qualities.join(",")}|${state.king.flaw}|${state.standing
-    .map((e) => e.edict)
-    .join(",")}`;
+  return [
+    state.king.background,
+    state.king.qualities.join(","),
+    state.king.flaw,
+    state.standing.map((e) => e.edict).join(","),
+    state.effects.map((e) => e.kind).join(","),
+  ].join("|");
 }
 
 export function auraModifiers(state: GameState): AuraModifiers {
@@ -170,6 +174,11 @@ function computeAuraModifiers(state: GameState): AuraModifiers {
     if (effect.fearMultiplier) multiply.fear *= effect.fearMultiplier;
     if (effect.defenseMultiplier) multiply.defense *= effect.defenseMultiplier;
   }
+
+  // Every timed effect so far is a festival: wonderful for the pirates, and it
+  // costs captive resignation for exactly as long as it lasts.
+  add.anarchy += 22 * state.effects.length;
+  add.order -= 10 * state.effects.length;
 
   for (const standing of state.standing) {
     switch (standing.edict) {

@@ -40,6 +40,8 @@ interface SavedState {
   nations: GameState["nations"];
   regions: GameState["regions"];
   standing: GameState["standing"];
+  /** Absent in saves written before timed effects existed. */
+  effects?: GameState["effects"];
   marketMarkup: GameState["marketMarkup"];
   raisings: number;
   notices: GameState["notices"];
@@ -73,6 +75,7 @@ export function serialize(state: GameState): string {
     nations: state.nations,
     regions: state.regions,
     standing: state.standing,
+    effects: state.effects,
     marketMarkup: state.marketMarkup,
     raisings: state.raisings,
     notices: state.notices,
@@ -123,6 +126,8 @@ export function deserialize(text: string): GameState {
     nations: saved.nations,
     regions: saved.regions,
     standing: saved.standing,
+    // Saves written before timed effects existed simply have none in flight.
+    effects: saved.effects ?? [],
     marketMarkup: saved.marketMarkup,
     raisings: saved.raisings,
     notices: saved.notices,

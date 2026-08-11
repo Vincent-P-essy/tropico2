@@ -220,6 +220,12 @@ export interface StandingEdict {
   nation: NationId | null;
 }
 
+/** A one-off edict whose effect fades rather than stopping dead. */
+export interface TimedEffect {
+  kind: "festival";
+  ticksLeft: number;
+}
+
 export interface King {
   name: string;
   captainId: string;
@@ -276,6 +282,12 @@ export interface GameState {
   nations: Record<NationId, NationState>;
   regions: Record<RegionId, RegionState>;
   standing: StandingEdict[];
+  /**
+   * Effects with a clock on them: a festival's surge of anarchy, the lift a
+   * shipment of free rum gives every pirate on the island. Kept as data so they
+   * survive a save and expire on their own.
+   */
+  effects: TimedEffect[];
   /** Black-market price multipliers, which climb as you buy. */
   marketMarkup: Partial<Record<GoodId, number>>;
   /** Times the graveyard has been used; each raising costs more. */

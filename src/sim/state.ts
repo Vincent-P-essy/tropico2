@@ -97,6 +97,7 @@ export function createState(options: NewGameOptions): GameState {
     nations,
     regions,
     standing: [],
+    effects: [],
     marketMarkup: {},
     raisings: 0,
     notices: [],

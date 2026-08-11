@@ -10,6 +10,8 @@ import { updatePerson } from "./behaviour.ts";
 import { updateFleet } from "./fleet.ts";
 import { updateDiplomacy, updateUnrest } from "./unrest.ts";
 import { checkScenario } from "./objectives.ts";
+import { updateEffects } from "./edicts.ts";
+import { relaxMarket } from "./trade.ts";
 import { isMonthBoundary, payUpkeep, produce, runConstruction } from "./economy.ts";
 import { autoAssign } from "./employment.ts";
 import { clampRelations, notify } from "./state.ts";
@@ -35,6 +37,7 @@ export function tick(state: GameState, hours = 1): void {
 
   for (const person of state.people.values()) updatePerson(state, person, hours);
 
+  updateEffects(state, hours);
   updateUnrest(state, hours);
   updateFleet(state, hours);
 
@@ -116,6 +119,7 @@ export function upgradePalace(state: GameState): void {
 function monthlyTick(state: GameState): void {
   payUpkeep(state);
   updateDiplomacy(state);
+  relaxMarket(state);
   checkScenario(state);
 
   for (const id of NATION_IDS) {
