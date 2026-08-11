@@ -205,6 +205,17 @@ kind of mistake — a rule that was locally reasonable and globally fatal:
   is mostly sea: **eleven of twelve pirates had no plot**, and so had resting and
   stashing at zero from the first hour. Frontage is now made rather than found —
   the road is routed out to a site before anything is built on it.
+- The island **starved itself to death**, and only on some seeds — which is what
+  made it so hard to see. The kitchens were crewed before the farms that fed
+  them, the larders started empty against a twelve-day death clock, one farm
+  could fail to find fertile ground, and every captive who died took a pair of
+  hands off the farms so the survivors ate less still. One island in eight
+  emptied completely inside a year. Hunger now drives a captive to the water
+  rather than into the ground, which is what the original's captives mostly did,
+  and the population settles at what the island can feed.
+- The log **said the same thing six times** while the news was scrolling off the
+  top. An unhappy island brawls constantly; three captives starving to death
+  went unread underneath it.
 - The powers never came. Relations, forts, guards and the patron edict all led
   to an invasion that **nothing ever called**, so three nations could spend a
   decade at war with the haven without one sail on the horizon.
