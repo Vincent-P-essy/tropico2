@@ -5,7 +5,15 @@ import { auraReadout } from "./auras.ts";
 import { buildShip } from "./fleet.ts";
 import { population, tickMany } from "./game.ts";
 import { generateIsland } from "./island.ts";
-import { deserialize, serialize } from "./save.ts";
+import {
+  deleteSlot,
+  describeSlot,
+  deserialize,
+  listSlots,
+  loadFromSlot,
+  saveToSlot,
+  serialize,
+} from "./save.ts";
 import { newGame, startScenario } from "./setup.ts";
 import { addBuilding, finishedBuildings } from "./state.ts";
 import type { GameState } from "./types.ts";
@@ -150,5 +158,68 @@ describe("save and load", () => {
     const text = serialize(played());
     const bumped = text.replace('"version":1', '"version":99');
     expect(() => deserialize(bumped)).toThrow(/version/);
+  });
+});
+
+describe("slots", () => {
+  /**
+   * A localStorage that lives in memory.
+   *
+   * The simulation tests run in node with no DOM, which is why the slot side of
+   * saving went untested for so long — and why nothing noticed that the game
+   * could save and never load.
+   */
+  function withStorage<T>(body: () => T): T {
+    const store = new Map<string, string>();
+    const shim = {
+      get length(): number {
+        return store.size;
+      },
+      key: (i: number): string | null => [...store.keys()][i] ?? null,
+      getItem: (k: string): string | null => store.get(k) ?? null,
+      setItem: (k: string, v: string): void => {
+        store.set(k, v);
+      },
+      removeItem: (k: string): void => {
+        store.delete(k);
+      },
+      clear: (): void => {
+        store.clear();
+      },
+    };
+    const global = globalThis as { localStorage?: unknown };
+    const had = "localStorage" in global;
+    const previous = global.localStorage;
+    global.localStorage = shim;
+    try {
+      return body();
+    } finally {
+      if (had) global.localStorage = previous;
+      else delete global.localStorage;
+    }
+  }
+
+  it("takes a haven out of a slot and puts it back the same", () => {
+    withStorage(() => {
+      const state = played();
+      expect(saveToSlot(state, "quick")).toBe(true);
+      const back = loadFromSlot("quick");
+      expect(back).not.toBeNull();
+      expect(back?.tick).toBe(state.tick);
+      expect(listSlots()).toContain("quick");
+      deleteSlot("quick");
+      expect(loadFromSlot("quick")).toBeNull();
+    });
+  });
+
+  it("says what is in a slot without being asked to open it", () => {
+    withStorage(() => {
+      const state = played();
+      saveToSlot(state, "quick");
+      const line = describeSlot("quick");
+      expect(line).toMatch(/pirates/);
+      expect(line).toMatch(/captives/);
+      expect(describeSlot("nothing-here")).toBeNull();
+    });
   });
 });

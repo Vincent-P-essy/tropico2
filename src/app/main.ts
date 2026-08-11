@@ -25,7 +25,7 @@ import { FleetPanel } from "../ui/fleet-panel.ts";
 import { Hud, type Selection } from "../ui/hud.ts";
 import { assignToBuilding, release as releaseWorker } from "../sim/employment.ts";
 import { buildShip, crewShip, launch, loadShip, recall, recruitCaptain } from "../sim/fleet.ts";
-import { loadFromSlot, saveToSlot } from "../sim/save.ts";
+import { describeSlot, loadFromSlot, saveToSlot } from "../sim/save.ts";
 import { evaluateScenario } from "../sim/objectives.ts";
 import { cancel as cancelEdict, issue as issueEdict } from "../sim/edicts.ts";
 import { buy as buyGoods, sell as sellGoods } from "../sim/trade.ts";
@@ -208,13 +208,29 @@ if (!chosenByUrl) {
   speedIndex = 0;
   const startRoot = document.createElement("div");
   document.body.append(startRoot);
-  new StartScreen(startRoot, seed, (choice) => {
-    state = choice.scenario
-      ? startScenario(choice.scenario, choice.seed, choice.king)
-      : newGame({ seed: choice.seed, islandSize: 64, king: choice.king });
-    lookAtSettlement();
-    speedIndex = 1;
-  });
+  const describe = describeSlot("quick");
+  new StartScreen(
+    startRoot,
+    seed,
+    (choice) => {
+      state = choice.scenario
+        ? startScenario(choice.scenario, choice.seed, choice.king)
+        : newGame({ seed: choice.seed, islandSize: 64, king: choice.king });
+      lookAtSettlement();
+      speedIndex = 1;
+    },
+    {
+      saved: describe === null ? null : { slot: "quick", describe },
+      onResume: (slot) => {
+        const loaded = loadFromSlot(slot);
+        if (!loaded) return;
+        state = loaded;
+        lookAtSettlement();
+        speedIndex = 1;
+        notify(state, "good", "Welcome back");
+      },
+    },
+  );
 }
 
 resize();

@@ -21,6 +21,12 @@ export interface StartChoice {
   seed: number;
 }
 
+/** A saved haven the player can go back to, if one is on this machine. */
+export interface SavedGame {
+  slot: string;
+  describe: string;
+}
+
 const MEDAL_KEY = "tropico2.medals";
 
 export type Medal = "gold" | "silver" | "bronze";
@@ -84,13 +90,22 @@ export function describeTraits(captain: CaptainDef): { name: string; text: strin
 export class StartScreen {
   private readonly root: HTMLElement;
   private readonly onBegin: (choice: StartChoice) => void;
+  private readonly saved: SavedGame | null;
+  private readonly onResume: ((slot: string) => void) | null;
   private captain: CaptainDef;
   private scenario: Scenario | null = null;
   private seed: number;
 
-  constructor(root: HTMLElement, seed: number, onBegin: (choice: StartChoice) => void) {
+  constructor(
+    root: HTMLElement,
+    seed: number,
+    onBegin: (choice: StartChoice) => void,
+    resume?: { saved: SavedGame | null; onResume: (slot: string) => void },
+  ) {
     this.root = root;
     this.onBegin = onBegin;
+    this.saved = resume?.saved ?? null;
+    this.onResume = resume?.onResume ?? null;
     this.seed = seed;
     // The campaign's own Pirate King wears Henry Morgan's face, so he leads.
     const preferred = CAPTAINS.find((c) => c.id === "henryMorgan") ?? CAPTAINS[0];
@@ -119,6 +134,23 @@ export class StartScreen {
     blurb.textContent =
       "Your pirates want anarchy. Your captives need order. They live on the same island.";
     this.root.append(title, blurb);
+
+    // A haven already on this machine comes first: there is no reason to make
+    // somebody choose a king again to go back to the island they were playing.
+    if (this.saved && this.onResume) {
+      const { slot, describe } = this.saved;
+      const resume = el("button", "start-item resume");
+      const name = el("span");
+      name.textContent = "Return to your haven";
+      const note = el("span", "note");
+      note.textContent = describe;
+      resume.append(name, note);
+      resume.addEventListener("click", () => {
+        this.root.remove();
+        this.onResume?.(slot);
+      });
+      this.root.append(resume);
+    }
 
     const columns = el("div", "start-columns");
     columns.append(this.modeColumn(), this.kingColumn());

@@ -775,3 +775,15 @@ button.worker.busy {
 .row.clickable:hover {
   background: rgba(96, 76, 50, 0.5);
 }
+
+/* The way back to a haven already on this machine, above the two columns. */
+#start .start-item.resume {
+  width: min(680px, 92vw);
+  margin: 0 auto 14px;
+  border-color: var(--accent);
+  background: rgba(214, 168, 78, 0.12);
+}
+
+#start .start-item.resume span:first-child {
+  color: var(--accent);
+}

@@ -2,6 +2,7 @@ import { ByteField, IdField, ScalarField } from "../core/field.ts";
 import { Rng } from "../core/rng.ts";
 import { scenarioById } from "../data/scenarios.ts";
 import { rebuildAuras, createAuraFields } from "./auras.ts";
+import { formatDate, population } from "./game.ts";
 import { generateIsland, type Island } from "./island.ts";
 import type { Building, GameState, Person, Ship } from "./types.ts";
 
@@ -168,6 +169,20 @@ export function loadFromSlot(slot: string): GameState | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * A saved game in one line, for the button that goes back to it.
+ *
+ * Deserialising a whole island to label a button is more work than a label
+ * deserves, but there is only ever one of them and it happens once, before the
+ * game starts, on a screen that is waiting for a click anyway.
+ */
+export function describeSlot(slot: string): string | null {
+  const state = loadFromSlot(slot);
+  if (!state) return null;
+  const counts = population(state);
+  return `${formatDate(state)} · ${counts.pirates} pirates · ${counts.captives} captives`;
 }
 
 export function listSlots(): string[] {

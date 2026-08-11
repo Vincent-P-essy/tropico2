@@ -74,7 +74,7 @@ content in the middle of an orderly district.
 | The almanac        | `A` — why the numbers in the top bar are what they are                    |
 | Turn a building    | `R` before placing it                                                     |
 | Speed              | `space` to pause, `1`–`4`                                                 |
-| Save               | `Ctrl`/`Cmd` + `S`                                                        |
+| Save               | `Ctrl`/`Cmd` + `S` — and the start screen offers the way back             |
 | A specific island  | add `?seed=1650` to the URL                                               |
 | A campaign episode | add `?episode=1` … `?episode=16`                                          |
 
@@ -169,15 +169,19 @@ npm test             # 380 tests, no browser needed
 npm run typecheck
 npm run lint
 npm run screenshot   # boots the real game headless and photographs it
+npm run resume       # plays, saves, reloads the page, and goes back to it
 ```
 
 `npm run screenshot` doubles as the end-to-end test: it plays twenty months in
 headless Chromium and fails if the world did not advance, if the canvas drew
-nothing, or if anything reached the console.
+nothing, or if anything reached the console. `npm run resume` covers the one
+thing unit tests cannot, because it spans two page loads — that a saved haven
+can be got back out again through the screen a player actually uses.
 
 ## Notes from building it
 
-Seven bugs during development each killed the whole island, and every one is now
+Nine bugs during development each killed the whole island, or quietly removed a
+whole part of it, and every one is now
 locked down by a test. They are worth listing because they were all the same
 kind of mistake — a rule that was locally reasonable and globally fatal:
 
@@ -201,6 +205,11 @@ kind of mistake — a rule that was locally reasonable and globally fatal:
   is mostly sea: **eleven of twelve pirates had no plot**, and so had resting and
   stashing at zero from the first hour. Frontage is now made rather than found —
   the road is routed out to a site before anything is built on it.
+- The powers never came. Relations, forts, guards and the patron edict all led
+  to an invasion that **nothing ever called**, so three nations could spend a
+  decade at war with the haven without one sail on the horizon.
+- The game could **save but not load**. Nothing was wired to the way back, and
+  no unit test could have caught it: it takes two page loads to see.
 - Staffing went straight down the priority list, filling each building to its
   last man before starting the next, so **every tavern, pit and masseuse stood
   empty** behind the counter while the farms took every pair of hands. Sharing
