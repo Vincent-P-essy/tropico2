@@ -15,7 +15,7 @@ import {
   serialize,
 } from "./save.ts";
 import { newGame, startScenario } from "./setup.ts";
-import { addBuilding, finishedBuildings } from "./state.ts";
+import { addBuilding, createState, finishedBuildings, notify } from "./state.ts";
 import type { GameState } from "./types.ts";
 
 function played(seed = 4242, months = 4): GameState {
@@ -156,7 +156,7 @@ describe("save and load", () => {
 
   it("refuses a save from another version", () => {
     const text = serialize(played());
-    const bumped = text.replace('"version":1', '"version":99');
+    const bumped = text.replace(/"version":\d+/, '"version":99');
     expect(() => deserialize(bumped)).toThrow(/version/);
   });
 });
@@ -221,5 +221,33 @@ describe("slots", () => {
       expect(line).toMatch(/captives/);
       expect(describeSlot("nothing-here")).toBeNull();
     });
+  });
+});
+
+describe("the log", () => {
+  it("folds a thing that keeps happening into one line with a number", () => {
+    const state = createState({ seed: 3, islandSize: 24 });
+    notify(state, "warning", "Kit is brawling", null, "brawl");
+    notify(state, "warning", "Anne is brawling", null, "brawl");
+    notify(state, "warning", "Kit is brawling", null, "brawl");
+
+    expect(state.notices).toHaveLength(1);
+    expect(state.notices[0]?.count).toBe(3);
+    // The line shows whoever swung last, not whoever swung first.
+    expect(state.notices[0]?.text).toBe("Kit is brawling");
+
+    // Something else breaks the run, and the brawls do not swallow it.
+    notify(state, "bad", "A Spanish squadron is standing in");
+    notify(state, "warning", "Kit is brawling", null, "brawl");
+    expect(state.notices).toHaveLength(3);
+    expect(state.notices[2]?.count).toBe(1);
+  });
+
+  it("folds exact repeats even without a topic", () => {
+    const state = createState({ seed: 3, islandSize: 24 });
+    notify(state, "info", "The sawmill has no lumberjack");
+    notify(state, "info", "The sawmill has no lumberjack");
+    expect(state.notices).toHaveLength(1);
+    expect(state.notices[0]?.count).toBe(2);
   });
 });

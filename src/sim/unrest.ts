@@ -4,6 +4,7 @@ import {
   CAPTIVE_ESCAPE,
   CAPTIVE_REBELLION,
   DESERTION_CHANCE_PER_DAY,
+  STARVATION_DAYS,
   ESCAPE_CHANCE_PER_DAY,
   ESCAPE_COURAGE,
   FORT_DEFENSE,
@@ -56,8 +57,12 @@ function updateCaptiveUnrest(state: GameState, person: Person, days: number): vo
     return;
   }
 
-  if (person.mood > CAPTIVE_ESCAPE) return;
-  if (person.courage < ESCAPE_COURAGE) return;
+  // Hunger overrules both of the usual gates. A man three days from dying does
+  // not need a grievance to run, and does not need to be brave either.
+  const hunger = Math.min(1, person.starving / STARVATION_DAYS);
+  const famished = hunger > 0.5;
+  if (person.mood > CAPTIVE_ESCAPE && !famished) return;
+  if (person.courage < ESCAPE_COURAGE && !famished) return;
 
   // Informants earn their keep here: the player is told who is thinking about
   // it while there is still time to press-gang, ransom or frighten them.
@@ -66,10 +71,13 @@ function updateCaptiveUnrest(state: GameState, person: Person, days: number): vo
     person.mood <= CAPTIVE_ESCAPE * 0.7 &&
     state.rng.chance(0.02 * days)
   ) {
-    notify(state, "warning", `An informant says ${person.name} is planning to run`, {
-      x: person.x,
-      y: person.y,
-    });
+    notify(
+      state,
+      "warning",
+      `An informant says ${person.name} is planning to run`,
+      { x: person.x, y: person.y },
+      "informant",
+    );
   }
 
   // Guards on the roads make running a worse idea.
@@ -87,7 +95,22 @@ function updateCaptiveUnrest(state: GameState, person: Person, days: number): vo
     return;
   }
 
-  if (state.rng.chance(ESCAPE_CHANCE_PER_DAY * days * desperation * deterrence)) {
+  /*
+   * A starving man runs long before he lies down.
+   *
+   * Without this the island is bistable: a captive who starves to death is a
+   * pair of hands off the farms, so the survivors eat less still, and an island
+   * that was merely short of food empties completely — thirty-six dead inside a
+   * year on one seed in eight, with nothing the player could have done after
+   * the first month. Letting hunger drive him to the water instead costs the
+   * haven exactly as much, since the hands are gone either way and he carries
+   * the bearing home to his king, but the population settles at what the island
+   * can feed rather than falling straight past it. Only those with nowhere to
+   * run starve, which is what the original's stockades were for.
+   */
+  const urge = Math.max(desperation, hunger * hunger);
+
+  if (state.rng.chance(ESCAPE_CHANCE_PER_DAY * days * urge * deterrence)) {
     beginEscape(state, person);
   }
 }
@@ -102,10 +125,13 @@ function updatePirateUnrest(state: GameState, person: Person, days: number): voi
     if (state.rng.chance(0.03 * days)) {
       person.activity = "rioting";
       person.timer = 6;
-      notify(state, "warning", `${person.name} is brawling — the pirates are unhappy`, {
-        x: person.x,
-        y: person.y,
-      });
+      notify(
+        state,
+        "warning",
+        `${person.name} is brawling — the pirates are unhappy`,
+        { x: person.x, y: person.y },
+        "brawl",
+      );
     }
     return;
   }
@@ -131,7 +157,13 @@ function updatePirateUnrest(state: GameState, person: Person, days: number): voi
   // The further below the line, the faster they go.
   const despair = Math.min(1, (PIRATE_REVOLT - person.mood) / PIRATE_REVOLT);
   if (state.rng.chance(DESERTION_CHANCE_PER_DAY * days * despair)) {
-    notify(state, "bad", `${person.name} has deserted the island`, { x: person.x, y: person.y });
+    notify(
+      state,
+      "bad",
+      `${person.name} has deserted the island`,
+      { x: person.x, y: person.y },
+      "desert",
+    );
     removePerson(state, person);
   }
 }
@@ -141,10 +173,13 @@ function beginEscape(state: GameState, person: Person): void {
   if (!shore) return;
   if (!routeToTile(state, person, shore.x, shore.y)) return;
   person.activity = "fleeing";
-  notify(state, "warning", `${person.name} is running for the water`, {
-    x: person.x,
-    y: person.y,
-  });
+  notify(
+    state,
+    "warning",
+    `${person.name} is running for the water`,
+    { x: person.x, y: person.y },
+    "flee",
+  );
 }
 
 function escapeSucceeds(state: GameState, person: Person): void {
@@ -162,10 +197,16 @@ function escapeSucceeds(state: GameState, person: Person): void {
         `${person.name} has escaped and reached ${NATIONS[nation].name}. They know where we are.`,
       );
     } else {
-      notify(state, "warning", `${person.name} has escaped`);
+      notify(state, "warning", `${person.name} has escaped`, null, "escape");
     }
   } else {
-    notify(state, "warning", `${person.name} has escaped, but told nobody where we lie`);
+    notify(
+      state,
+      "warning",
+      `${person.name} has escaped, but told nobody where we lie`,
+      null,
+      "escape",
+    );
   }
 
   removePerson(state, person);

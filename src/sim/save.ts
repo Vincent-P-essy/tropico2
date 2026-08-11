@@ -16,7 +16,10 @@ import type { Building, GameState, Person, Ship } from "./types.ts";
  * either; they are a pure function of the buildings and are rebuilt on load.
  */
 
-const VERSION = 1;
+// 2: notices carry how many times the same thing just happened. A version 1
+// save has no such field, and rather than guess one, the game says plainly that
+// it cannot read it - which loadFromSlot turns into "there is no save".
+const VERSION = 2;
 
 interface SavedState {
   version: number;

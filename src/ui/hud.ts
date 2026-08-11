@@ -65,6 +65,8 @@ export class Hud {
   private overlay: Overlay = "none";
   private speed = 1;
   private lastNoticeId = -1;
+  /** Repeats coalesce into the same notice, so its count has to be watched too. */
+  private lastNoticeCount = 0;
 
   private readonly callbacks: HudCallbacks;
 
@@ -605,8 +607,10 @@ export class Hud {
 
   private renderNotices(state: GameState): void {
     const latest = state.notices.at(-1);
-    if (!latest || latest.id === this.lastNoticeId) return;
+    if (!latest) return;
+    if (latest.id === this.lastNoticeId && latest.count === this.lastNoticeCount) return;
     this.lastNoticeId = latest.id;
+    this.lastNoticeCount = latest.count;
 
     this.noticeList.innerHTML = "";
     for (const notice of state.notices.slice(-8)) {
@@ -614,7 +618,7 @@ export class Hud {
       const when = el("span", "when");
       when.textContent = `${Math.floor(notice.tick / 720) + 1}m`;
       const what = el("span", "what");
-      what.textContent = notice.text;
+      what.textContent = notice.count > 1 ? `${notice.text} ×${notice.count}` : notice.text;
       line.append(when, what);
       if (notice.at) {
         const target = notice.at;

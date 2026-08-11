@@ -434,8 +434,24 @@ export function notify(
   kind: NoticeKind,
   text: string,
   at: { x: number; y: number } | null = null,
+  topic?: string,
 ): void {
-  const notice: Notice = { id: nextId(state), tick: state.tick, kind, text, at };
+  // The same thing happening six times running is one line with a number after
+  // it, not six lines. An island of unhappy pirates brawls constantly, and a log
+  // that says so six times over has pushed everything worth reading off the top.
+  const last = state.notices.at(-1);
+  const sameNews =
+    last?.kind === kind && (topic === undefined ? last.text === text : last.topic === topic);
+  if (last && sameNews) {
+    last.count++;
+    last.tick = state.tick;
+    last.text = text;
+    if (at) last.at = at;
+    return;
+  }
+
+  const notice: Notice = { id: nextId(state), tick: state.tick, kind, text, at, count: 1 };
+  if (topic !== undefined) notice.topic = topic;
   state.notices.push(notice);
   // The log is a feed, not an archive; keeping the last 200 is plenty for the UI.
   if (state.notices.length > 200) state.notices.splice(0, state.notices.length - 200);

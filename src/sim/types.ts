@@ -252,6 +252,15 @@ export interface Notice {
   text: string;
   /** Camera target, so clicking the notice shows the problem. */
   at: Point | null;
+  /** How many times this same thing has just happened. */
+  count: number;
+  /**
+   * What this notice is about, when several different lines are really one
+   * piece of news. Brawls name whoever swung first, so an unhappy island
+   * produces six different sentences that say the same thing; giving them all
+   * the topic "brawl" folds them into one line with a number after it.
+   */
+  topic?: string;
 }
 
 export type GameStatus = "playing" | "won" | "lost";
