@@ -6,11 +6,11 @@ import {
   type BuildingId,
 } from "../data/buildings.ts";
 import { GOODS, type GoodId } from "../data/goods.ts";
-import { JOBS } from "../data/jobs.ts";
+import { JOBS, type JobId } from "../data/jobs.ts";
 import { NEEDS } from "../data/needs.ts";
 import { auraReadout } from "../sim/auras.ts";
 import { stockOf } from "../sim/economy.ts";
-import { openSlots } from "../sim/employment.ts";
+import { canWork, openSlots } from "../sim/employment.ts";
 import { captiveResignation, formatDate, pirateHappiness, population } from "../sim/game.ts";
 import { describePerson, moodTarget } from "../sim/people.ts";
 import { evaluateScenario } from "../sim/objectives.ts";
@@ -36,6 +36,11 @@ export interface HudCallbacks {
   onTogglePriority: (id: number) => void;
   onToggleEnabled: (id: number) => void;
   onFocus: (x: number, y: number) => void;
+  /** Put this person to work here, taking them off whatever they were doing. */
+  onAssign: (person: number, building: number) => void;
+  /** Take this person off their post. */
+  onRelease: (person: number) => void;
+  onSelectPerson: (person: number) => void;
 }
 
 export interface Selection {
@@ -264,16 +269,24 @@ export class Hud {
   }
 
   /** Live feedback under the cursor while placing. */
-  showPlacement(state: GameState, id: BuildingId | null, x: number, y: number): boolean {
+  showPlacement(
+    state: GameState,
+    id: BuildingId | null,
+    x: number,
+    y: number,
+    rotation: 0 | 1 = 0,
+  ): boolean {
     if (!id) {
       this.hint.classList.remove("show");
       return false;
     }
-    const check = canPlace(state, id, x, y);
+    const def = BUILDINGS[id];
+    const check = canPlace(state, id, x, y, rotation);
+    const turnable = def.w !== def.h;
     this.hint.classList.add("show");
     this.hint.classList.toggle("bad", !check.ok);
     this.hint.textContent = check.ok
-      ? `${BUILDINGS[id].name} — click to build, right-click to cancel`
+      ? `${def.name} — click to build${turnable ? ", R to turn" : ""}, right-click to cancel`
       : (check.reason ?? "Cannot build here");
     return check.ok;
   }
@@ -368,17 +381,32 @@ export class Hud {
       heading.textContent = "Staff";
       section.append(heading);
 
-      const wanted = new Map<string, number>();
-      for (const slot of def.staff) wanted.set(slot.job, slot.count);
-      const have = new Map<string, number>();
+      // Named people, not just counts. The original gave the player no say in
+      // who worked where, which is how a tavern could sit dry for a year.
+      const byJob = new Map<JobId, Person[]>();
       for (const id of building.workers) {
         const worker = state.people.get(id);
-        if (worker?.job) have.set(worker.job.job, (have.get(worker.job.job) ?? 0) + 1);
+        if (!worker?.job) continue;
+        const list = byJob.get(worker.job.job) ?? [];
+        list.push(worker);
+        byJob.set(worker.job.job, list);
       }
-      for (const [job, count] of wanted) {
-        section.append(
-          row(JOBS[job as keyof typeof JOBS].name, `${have.get(job) ?? 0} / ${count}`),
-        );
+
+      for (const slot of def.staff) {
+        const held = byJob.get(slot.job) ?? [];
+        section.append(row(JOBS[slot.job].name, `${held.length} / ${slot.count}`));
+
+        const line = el("div", "chip-row");
+        for (const worker of held) {
+          const chip = el("button", "worker");
+          chip.textContent = `${worker.name} ✕`;
+          chip.title = `Take ${worker.name} off this post`;
+          chip.addEventListener("click", () => {
+            this.callbacks.onRelease(worker.id);
+          });
+          line.append(chip);
+        }
+        if (held.length > 0) section.append(line);
       }
 
       const missing = openSlots(state, building).reduce((n, slot) => n + slot.count, 0);
@@ -386,6 +414,7 @@ export class Hud {
         const note = el("div", "desc");
         note.textContent = `${missing} post${missing === 1 ? "" : "s"} unfilled.`;
         section.append(note);
+        section.append(this.hiringList(state, building));
       }
       this.inspector.append(section);
     }
@@ -450,6 +479,59 @@ export class Hud {
     this.inspector.append(actions);
   }
 
+  /**
+   * Who could be put on the open posts here, nearest first.
+   *
+   * Shows a handful rather than the whole island: the point is to fix a
+   * particular building that is standing idle, not to run a labour exchange.
+   */
+  private hiringList(state: GameState, building: Building): HTMLElement {
+    const wrap = el("div", "chip-row");
+    const slots = openSlots(state, building);
+
+    const candidates: { person: Person; job: JobId; distance: number }[] = [];
+    for (const person of state.people.values()) {
+      if (person.activity === "dead" || person.activity === "atSea") continue;
+      const slot = slots.find((s) => canWork(person, s.job));
+      if (!slot) continue;
+      // Somebody already doing this exact job here is not a candidate.
+      if (person.job?.building === building.id) continue;
+      candidates.push({
+        person,
+        job: slot.job,
+        distance: Math.hypot(person.x - building.x, person.y - building.y),
+      });
+    }
+
+    if (candidates.length === 0) {
+      const none = el("div", "desc");
+      none.textContent = "Nobody on the island can fill these posts.";
+      return none;
+    }
+
+    // Idle people first, then the nearest — taking somebody off another job is
+    // a real cost, so it should not be the default suggestion.
+    candidates.sort(
+      (a, b) =>
+        Number(a.person.job !== null) - Number(b.person.job !== null) || a.distance - b.distance,
+    );
+
+    for (const candidate of candidates.slice(0, 6)) {
+      const chip = el("button", "worker");
+      const busy = candidate.person.job !== null;
+      chip.textContent = `+ ${candidate.person.name}`;
+      chip.classList.toggle("busy", busy);
+      chip.title = busy
+        ? `${candidate.person.name} is working elsewhere — hiring them here takes them off it`
+        : `Put ${candidate.person.name} on as ${JOBS[candidate.job].name.toLowerCase()}`;
+      chip.addEventListener("click", () => {
+        this.callbacks.onAssign(candidate.person.id, building.id);
+      });
+      wrap.append(chip);
+    }
+    return wrap;
+  }
+
   private renderPersonPanel(state: GameState, person: Person): void {
     const title = el("h3");
     title.textContent = person.name;
@@ -457,6 +539,25 @@ export class Hud {
     const job = person.job ? JOBS[person.job.job].name : "unemployed";
     sub.textContent = `${describePerson(person)} · ${job} · ${person.activity}`;
     this.inspector.append(title, sub);
+
+    if (person.job) {
+      const workplace = state.buildings.get(person.job.building);
+      if (workplace) {
+        const actions = el("div", "chip-row");
+        const goto = el("button");
+        goto.textContent = `Go to ${BUILDINGS[workplace.def].name}`;
+        goto.addEventListener("click", () => {
+          this.callbacks.onFocus(workplace.x, workplace.y);
+        });
+        const quit = el("button");
+        quit.textContent = "Take off the job";
+        quit.addEventListener("click", () => {
+          this.callbacks.onRelease(person.id);
+        });
+        actions.append(goto, quit);
+        this.inspector.append(actions);
+      }
+    }
 
     const mood = moodTarget(state, person);
     this.inspector.append(
