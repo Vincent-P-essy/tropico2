@@ -7,6 +7,7 @@
  * build, or the loop throws, this exits non-zero with the console output.
  *
  *   node scripts/screenshot.mjs [--months 18] [--seed 1650] [--out docs/screenshot.png]
+ *                                [--overlay order] [--press a]
  */
 
 import { spawn } from "node:child_process";
@@ -23,6 +24,8 @@ const months = Number(args.get("months") ?? 18);
 const seed = Number(args.get("seed") ?? 1650);
 const out = args.get("out") ?? "docs/screenshot.png";
 const overlay = args.get("overlay") ?? "none";
+/** Keys to send before the photograph, so a panel can be caught open. */
+const press = (args.get("press") ?? "").split(",").filter(Boolean);
 const width = Number(args.get("width") ?? 1600);
 const height = Number(args.get("height") ?? 900);
 const zoom = Number(args.get("zoom") ?? 1.15);
@@ -121,6 +124,11 @@ try {
     await page.evaluate((value) => {
       window.tropico.setOverlay(value);
     }, overlay);
+  }
+
+  for (const key of press) {
+    await page.keyboard.press(key);
+    await new Promise((resolve) => setTimeout(resolve, 200));
   }
 
   // Let a few frames render so animation and the HUD settle.

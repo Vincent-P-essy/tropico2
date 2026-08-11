@@ -23,6 +23,10 @@ water, and which king:
 
 ![The start screen: sixteen campaign episodes on the left, sixteen Pirate Kings on the right, and what the selected king's traits actually do](docs/start.png)
 
+And when the top bar says happiness is seventeen per cent, the almanac says why:
+
+![The almanac, open on its People page: every need and aura for both populations, worst first](docs/almanac.png)
+
 The king is not decoration. A Decayed Gentleman runs a third more order across
 the whole island and starts on excellent terms with every power; an Iron-Handed
 one buys that order at the exact cost of every pirate's good humour; a king
@@ -64,7 +68,11 @@ content in the middle of an orderly district.
 | Build              | pick from the menu, click to place, right-click to cancel                 |
 | Inspect            | click a building or a person                                              |
 | See the auras      | the overlay buttons, top right — this is how you find your zoning problem |
+| Assign a worker    | click a building, then pick from its list of who could do the job         |
 | The fleet          | `F`                                                                       |
+| Edicts             | `E`                                                                       |
+| The almanac        | `A` — why the numbers in the top bar are what they are                    |
+| Turn a building    | `R` before placing it                                                     |
 | Speed              | `space` to pause, `1`–`4`                                                 |
 | Save               | `Ctrl`/`Cmd` + `S`                                                        |
 | A specific island  | add `?seed=1650` to the URL                                               |
@@ -112,9 +120,10 @@ reach food starves in a few weeks — and every one of them is in that one file.
 It was reviewed as a good idea with sharp edges. These are corrected, each in a
 way that leaves the mechanic intact:
 
-1. **Captives can be assigned.** The original gave you no say in who worked
-   where, so a tavern could sit dry for a year because the game had quietly
-   decided its hauler was better used on a farm.
+1. **You choose who works where.** The original gave you no say, so a tavern
+   could sit dry for a year because the game had quietly decided its hauler was
+   better used on a farm. Click a building and it lists who works there, who
+   could, and lets you swap them by name.
 2. **Broken supply chains say so.** Every building answers "why is this idle?"
    with the actual cause — no hauler, no input, no skilled worker — instead of
    silently producing nothing.
@@ -156,7 +165,7 @@ that was painting a third of the island black got caught._
 ```bash
 npm install
 npm run dev          # play it at localhost:5173
-npm test             # 376 tests, no browser needed
+npm test             # 380 tests, no browser needed
 npm run typecheck
 npm run lint
 npm run screenshot   # boots the real game headless and photographs it
@@ -168,7 +177,7 @@ nothing, or if anything reached the console.
 
 ## Notes from building it
 
-Five bugs during development each killed the whole island, and every one is now
+Seven bugs during development each killed the whole island, and every one is now
 locked down by a test. They are worth listing because they were all the same
 kind of mistake — a rule that was locally reasonable and globally fatal:
 
@@ -185,7 +194,19 @@ kind of mistake — a rule that was locally reasonable and globally fatal:
   produced buildings **nothing could reach**. Whoever lived there had those needs
   pinned at zero and the island quietly emptied over a few years. Roads now go
   down first, in a connected grid, and a building may only take a site fronting
-  one.
+  one — and since a later neighbour can still close the last door of an earlier
+  building, every placement is checked afterwards and taken back up if anybody
+  lost their way out.
+- Housing was laid at fixed offsets from the centre, which on a lopsided island
+  is mostly sea: **eleven of twelve pirates had no plot**, and so had resting and
+  stashing at zero from the first hour. Frontage is now made rather than found —
+  the road is routed out to a site before anything is built on it.
+- Staffing went straight down the priority list, filling each building to its
+  last man before starting the next, so **every tavern, pit and masseuse stood
+  empty** behind the counter while the farms took every pair of hands. Sharing
+  the hands out evenly instead makes priority meaningless and starves a hungry
+  island. Now it is a priority band at a time, and inside a band everybody gets
+  their first worker before anybody gets a second.
 
 And one piece of arithmetic worth writing down: a starting island of dives and
 bare plots caps near **thirty per cent** pirate happiness, because that is what
