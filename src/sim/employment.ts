@@ -169,19 +169,52 @@ export function autoAssign(state: GameState): number {
   });
 
   let assigned = 0;
-  for (const slot of slots) {
+
+  /** Puts one idle hand into this slot, or reports that nobody suitable was free. */
+  const take = (slot: OpenSlot): boolean => {
+    if (slot.count <= 0) return false;
     const pirateJob = JOBS[slot.job].workforce === "pirate";
-    for (let i = 0; i < slot.count; i++) {
-      if (pirateJob && pirateBerths <= 0) break;
-      const index = idle.findIndex((person) => canWork(person, slot.job));
-      if (index < 0) break;
-      const person = idle[index];
-      if (!person) break;
-      idle.splice(index, 1);
-      if (assignTo(state, person, slot.building, slot.job)) {
-        assigned++;
-        if (pirateJob) pirateBerths--;
-      }
+    if (pirateJob && pirateBerths <= 0) return false;
+
+    const index = idle.findIndex((person) => canWork(person, slot.job));
+    if (index < 0) return false;
+    const person = idle[index];
+    if (!person) return false;
+    idle.splice(index, 1);
+    if (!assignTo(state, person, slot.building, slot.job)) return false;
+
+    slot.count--;
+    assigned++;
+    if (pirateJob) pirateBerths--;
+    return true;
+  };
+
+  const bands = new Map<number, OpenSlot[]>();
+  for (const slot of slots) {
+    const weight = PRIORITY_WEIGHT[slot.building.priority];
+    const band = bands.get(weight);
+    if (band) band.push({ ...slot });
+    else bands.set(weight, [{ ...slot }]);
+  }
+
+  for (const weight of [...bands.keys()].sort((a, b) => b - a)) {
+    const band = bands.get(weight) ?? [];
+    if (idle.length === 0) break;
+
+    // One man everywhere in the band before anybody gets a second. A tavern with
+    // a single barman pours rum; a tavern with none is a shed.
+    const opened = new Set<number>();
+    for (const slot of band) {
+      if (idle.length === 0) break;
+      if (opened.has(slot.building.id)) continue;
+      if (take(slot)) opened.add(slot.building.id);
+    }
+
+    // Then round and round the band until it is full or nobody is left.
+    for (;;) {
+      let placed = false;
+      for (const slot of band) placed = take(slot) || placed;
+      if (!placed || idle.length === 0) break;
     }
   }
   return assigned;
