@@ -163,6 +163,11 @@ export function autoAssign(state: GameState): number {
   slots.sort((a, b) => {
     const weight = PRIORITY_WEIGHT[b.building.priority] - PRIORITY_WEIGHT[a.building.priority];
     if (weight !== 0) return weight;
+    // Up the supply chain, not down it. Crewing the kitchens before the farms
+    // puts five cooks to work on the corn one farmer can grow, and the island
+    // starves with its kitchens fully manned.
+    const chain = chainDepth(a.building) - chainDepth(b.building);
+    if (chain !== 0) return chain;
     const skilled = Number(JOBS[b.job].skilled) - Number(JOBS[a.job].skilled);
     if (skilled !== 0) return skilled;
     return a.building.id - b.building.id;
@@ -241,6 +246,20 @@ export function presentWorkers(state: GameState, building: Building): Map<JobId,
  * not run slowly, it does not run. An overseer standing over the work adds a
  * third again, which is the only reason to spend a pirate on it.
  */
+/**
+ * How far down the supply chain a building sits.
+ *
+ * Nothing to nobody: a farm or a timber camp takes from the ground and needs no
+ * delivery, so it can be worked first and always usefully. A brewery or a
+ * kitchen is idle until something upstream has run for a while. A tavern is
+ * worth staffing only once there is something to serve.
+ */
+function chainDepth(building: Building): number {
+  const def = BUILDINGS[building.def];
+  if (def.recipe) return def.recipe.inputs.length === 0 ? 0 : 1;
+  return 2;
+}
+
 export function workRate(state: GameState, building: Building): number {
   if (building.construction > 0 || !building.enabled) return 0;
   const def: BuildingDef = BUILDINGS[building.def];

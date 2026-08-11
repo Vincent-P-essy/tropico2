@@ -733,6 +733,22 @@ describe("running a whole island", () => {
     }
   });
 
+  it("never empties itself, whatever the island looks like", () => {
+    // The failure this guards against was bistable, which is what made it so
+    // hard to see: on most seeds a handful of captives starved and the island
+    // carried on, and on one in eight every single one of them was dead inside
+    // a year. Each death is a pair of hands off the farms, so the survivors ate
+    // less still. The three seeds here were the worst found.
+    for (const seed of [33, 4242, 909]) {
+      const state = flatGame({ seed });
+      const before = population(state).captives;
+      tickMany(state, TICKS_PER_DAY * 30 * 12);
+      const after = population(state).captives;
+      expect(after, `seed ${seed}: captives after a year`).toBeGreaterThan(before * 0.5);
+      expect(population(state).pirates, `seed ${seed}: pirates`).toBeGreaterThan(0);
+    }
+  });
+
   it("keeps both populations alive for a year and a half, unattended", () => {
     // Three seeds rather than eight, and eighteen months rather than twenty-four:
     // enough to catch a collapsing island, cheap enough to run on every commit.

@@ -1,3 +1,4 @@
+import { CAPTIVES_PER_BUNKHOUSE, CAPTIVES_PER_KITCHEN } from "../data/balance.ts";
 import { everyTile, idx, rectPerimeter, someTile, sumTiles, type Rect } from "../core/grid.ts";
 import { findPath, floodFill, octile } from "../core/path.ts";
 import { BUILDINGS, type BuildingId } from "../data/buildings.ts";
@@ -8,7 +9,7 @@ import type { Scenario } from "../data/scenarios.ts";
 import { monthIndex } from "../data/scenarios.ts";
 import { kingEffects, rawAura } from "./auras.ts";
 import { passable } from "./behaviour.ts";
-import { addStock } from "./economy.ts";
+import { addStock, stockCap } from "./economy.ts";
 import { autoAssign } from "./employment.ts";
 import { allocateHousing } from "./game.ts";
 import { findStartSite, isBuildable, isCoast } from "./island.ts";
@@ -49,11 +50,11 @@ export function newGame(options: StartOptions): GameState {
   }
 
   const pirateCount = options.pirates ?? 12;
-  layOpeningSettlement(state, site.x, site.y, pirateCount);
   // The opening settlement asks for roughly this many hands. Start with fewer
   // and the taverns never open, which reads as a broken game rather than a
   // choice the player made.
   const captiveCount = options.captives ?? 34;
+  layOpeningSettlement(state, site.x, site.y, pirateCount, captiveCount);
 
   for (let i = 0; i < pirateCount; i++) {
     const spot = scatter(state, site.x, site.y);
@@ -171,22 +172,65 @@ function depositAnywhere(state: GameState, good: GoodId, amount: number): void {
  * a site that touches one. Nothing can be stranded, because there is nowhere
  * stranded to put it.
  */
-function layOpeningSettlement(state: GameState, ox: number, oy: number, pirateCount: number): void {
+function layOpeningSettlement(
+  state: GameState,
+  ox: number,
+  oy: number,
+  pirateCount: number,
+  captiveCount: number,
+): void {
   layRoadGrid(state, ox, oy);
   const origin = { x: ox, y: oy };
 
+  /*
+   * The kitchen is sized to the mouths, not to a number somebody typed once.
+   *
+   * A chuck tent turns one corn into three slop every eight hours - nine a day,
+   * and a captive eats about one. Two tents for thirty-six captives is half a
+   * ration each, and the island opens by starving a third of them to death
+   * through no fault of the player's: on one seed nine were dead inside a year
+   * with nineteen still hungry. Nobody watching would have called it a bug,
+   * because starvation looks exactly like a hard game.
+   */
+  const kitchens = Math.max(2, Math.ceil(captiveCount / CAPTIVES_PER_KITCHEN));
+  const bunkhouses = Math.max(2, Math.ceil(captiveCount / CAPTIVES_PER_BUNKHOUSE));
+
   // Order matters: the things that keep people alive claim the best blocks.
   placeOnGrid(state, "stockade", origin, ox + 2, oy + 2);
-  placeOnGrid(state, "chuckTent", origin, ox - 4, oy + 2);
-  placeOnGrid(state, "chuckTent", origin, ox + 10, oy + 3);
-  placeOnGrid(state, "bunkhouse", origin, ox - 4, oy + 6);
-  placeOnGrid(state, "bunkhouse", origin, ox + 10, oy + 7);
+  for (let i = 0; i < kitchens; i++) {
+    const left = i % 2 === 0;
+    placeOnGrid(
+      state,
+      "chuckTent",
+      origin,
+      left ? ox - 4 : ox + 10,
+      oy + 2 + Math.floor(i / 2) * 3,
+    );
+  }
+  for (let i = 0; i < bunkhouses; i++) {
+    const left = i % 2 === 0;
+    placeOnGrid(
+      state,
+      "bunkhouse",
+      origin,
+      left ? ox - 8 : ox + 13,
+      oy + 6 + Math.floor(i / 2) * 3,
+    );
+  }
   placeOnGrid(state, "constructionTent", origin, ox + 2, oy - 3);
 
-  // Corn, or the chuck tents are sheds. Farms need fertile ground, so they get
-  // a road spur run out to them before they are placed.
-  placeOnResource(state, "cornFarm", ox, oy, 20, (x, y) => state.island.fertility.get(x, y));
-  placeOnResource(state, "cornFarm", ox, oy, 20, (x, y) => state.island.fertility.get(x, y));
+  // Corn, or the chuck tents are sheds. One farm grows nine corn a day and a
+  // kitchen eats three, so the farms follow the kitchens. Farms need fertile
+  // ground, so they get a road spur run out to them before they are placed.
+  const farms = Math.max(2, kitchens);
+
+  for (let i = 0; i < farms; i++) {
+    placeOnResource(state, "cornFarm", ox, oy, 20, (x, y) => state.island.fertility.get(x, y));
+  }
+
+  // And then count them, because wanting a farm is not the same as having one.
+  guaranteeFood(state, origin, farms, kitchens);
+  stockTheLarder(state);
 
   // The timber chain: the camp goes where the trees are, the mill on the grid.
   placeOnResource(state, "timberCamp", ox, oy, 22, (x, y) => state.island.forest.get(x, y));
@@ -476,6 +520,71 @@ const WELL_GUARDED = 20;
 
 /** As many guns as the opening settlement will pay for. */
 const QUARTER_GUNS = 10;
+
+/**
+ * Makes sure the food chain that was asked for is the food chain that stands.
+ *
+ * A corn farm wants fertile ground and a kitchen wants a road, and on a cramped
+ * island either can simply fail to find a site. The margin between what this
+ * settlement grows and what it eats is thin enough that one missing farm is
+ * fatal: on one seed the third farm found nowhere to go and every captive on
+ * the island was dead inside a year — not hungry, dead, all thirty-six, with
+ * the log showing nothing but starvation. The island already guarantees itself
+ * high ground so there is always ore; it can guarantee itself dinner too.
+ *
+ * The fallbacks give up on good ground before they give up on the building. A
+ * farm on poor soil grows less corn; a farm that was never built grows none.
+ */
+function guaranteeFood(
+  state: GameState,
+  origin: { x: number; y: number },
+  farmsWanted: number,
+  kitchensWanted: number,
+): void {
+  const count = (defId: BuildingId): number =>
+    [...state.buildings.values()].filter((b) => b.def === defId).length;
+
+  for (let attempt = 0; count("cornFarm") < farmsWanted && attempt < 12; attempt++) {
+    const reach = 20 + attempt * 3;
+    const placed = placeOnResource(state, "cornFarm", origin.x, origin.y, reach, (x, y) =>
+      Math.max(0.05, state.island.fertility.get(x, y)),
+    );
+    if (!placed && !placeOnGrid(state, "cornFarm", origin, origin.x, origin.y + 6, reach)) break;
+  }
+
+  for (let attempt = 0; count("chuckTent") < kitchensWanted && attempt < 12; attempt++) {
+    if (!placeOnGrid(state, "chuckTent", origin, origin.x, origin.y + 4, 14 + attempt * 2)) break;
+  }
+}
+
+/**
+ * Puts food in the pot before the first captive gets hungry.
+ *
+ * This settlement has been here long enough to have a stockade full of people,
+ * so it has grain in the barn — and without it the opening position is not
+ * merely hard, it is unsurvivable. The larders start empty, a captive dies
+ * twelve days after his last meal, and the corn has to be grown, carried and
+ * cooked before anybody eats: on one seed twenty-two of thirty-six were dead
+ * inside two months, before the player had done a single thing. Filling the
+ * pots buys the chain the fortnight it needs to turn over.
+ */
+function stockTheLarder(state: GameState): void {
+  for (const building of state.buildings.values()) {
+    const def = BUILDINGS[building.def];
+    if (def.recipe && def.recipe.inputs.length > 0) {
+      // A fortnight of inputs, so the cook has something to cook on day one.
+      for (const input of def.recipe.inputs) {
+        addStock(building, input.good, stockCap(building.def) * 0.5);
+      }
+    }
+    if (def.serves) addStock(building, servedGood(def), stockCap(building.def));
+  }
+}
+
+/** What a service building hands out: whatever its own recipe makes. */
+function servedGood(def: (typeof BUILDINGS)[BuildingId]): GoodId {
+  return def.recipe?.output ?? "slop";
+}
 
 function placeDecor(
   state: GameState,

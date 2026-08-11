@@ -216,3 +216,17 @@ export const BLACK_MARKET_MARKUP = 0.08;
 export const BLACK_MARKET_DECAY = 0.12;
 /** Base cost of recruiting a captain. */
 export const CAPTAIN_COST = 1500;
+
+/**
+ * Mouths one chuck tent is built for in the opening settlement.
+ *
+ * A tent makes nine slop a day and a captive eats about one, so on paper one
+ * tent per nine would be right. In practice a kitchen costs two captives to
+ * crew and the corn to fill it costs more, and an island given more kitchens
+ * than its farms can supply starves faster than one given fewer: the labour
+ * goes into cooking nothing. Twelve leaves the hands where the constraint is.
+ */
+export const CAPTIVES_PER_KITCHEN = 18;
+
+/** Captives one bunkhouse can bed down. */
+export const CAPTIVES_PER_BUNKHOUSE = 18;

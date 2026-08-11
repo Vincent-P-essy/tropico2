@@ -38,16 +38,20 @@ function island(seed = 4242, treasury = 50_000): GameState {
  */
 function plant(state: GameState, def: Parameters<typeof addBuilding>[1]): number {
   const { w, h } = BUILDINGS[def];
-  for (let y = 2; y < state.island.height - h - 2; y++) {
-    for (let x = 2; x < state.island.width - w - 2; x++) {
-      let clear = true;
-      for (let dy = -1; dy < h + 1 && clear; dy++) {
-        for (let dx = -1; dx < w + 1 && clear; dx++) {
-          if (state.occupancy.get(x + dx, y + dy) >= 0) clear = false;
-          if (state.island.terrain.get(x + dx, y + dy) < 2) clear = false;
+  // A tile of margin if the island can spare it, and none if it cannot: these
+  // tests care that the building exists, not that it has elbow room.
+  for (const margin of [1, 0]) {
+    for (let y = 1; y < state.island.height - h - 1; y++) {
+      for (let x = 1; x < state.island.width - w - 1; x++) {
+        let clear = true;
+        for (let dy = -margin; dy < h + margin && clear; dy++) {
+          for (let dx = -margin; dx < w + margin && clear; dx++) {
+            if (state.occupancy.get(x + dx, y + dy) >= 0) clear = false;
+            if (state.island.terrain.get(x + dx, y + dy) < 2) clear = false;
+          }
         }
+        if (clear) return addBuilding(state, def, x, y, { instant: true }).id;
       }
-      if (clear) return addBuilding(state, def, x, y, { instant: true }).id;
     }
   }
   throw new Error("nowhere to plant");
