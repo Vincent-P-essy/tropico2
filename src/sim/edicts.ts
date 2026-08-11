@@ -2,7 +2,7 @@ import { clamp } from "../core/grid.ts";
 import { RELATIONS_PER_RELEASE, TICKS_PER_DAY } from "../data/balance.ts";
 import { EDICTS, type EdictId } from "../data/edicts.ts";
 import { JOBS, PIRATE_SKILLS, type JobId, type PirateSkill } from "../data/jobs.ts";
-import { NATIONS, type NationId } from "../data/nations.ts";
+import { NATIONS, NATION_IDS, type NationId } from "../data/nations.ts";
 import type { GoodId } from "../data/goods.ts";
 import type { MissionId } from "../data/ships.ts";
 import type { RegionId } from "../data/nations.ts";
@@ -454,8 +454,20 @@ export function issue(state: GameState, id: EdictId, ctx: EdictContext = {}): Co
     case "fosterWar": {
       const ship = ctx.ship === undefined ? undefined : state.ships.get(ctx.ship);
       if (!ship) return fail("Pick a ship");
-      ship.log.push("Sailing under false colours");
-      notify(state, "info", `${ship.name} will wear another nation's flag`);
+      // She wears somebody else's flag, so the next prize she takes is blamed
+      // on them. Two of the great powers fall out; you are not mentioned.
+      const wearing = ctx.nation ?? state.rng.pick(NATION_IDS) ?? "england";
+      const blamed = NATION_IDS.filter((id) => id !== wearing);
+      for (const victim of blamed) {
+        state.nations[victim].relations = clampRelations(state.nations[victim].relations + 4);
+        state.nations[wearing].relations = clampRelations(state.nations[wearing].relations - 2);
+      }
+      ship.log.push(`Sailing under ${NATIONS[wearing].adjective} colours`);
+      notify(
+        state,
+        "info",
+        `${ship.name} will wear ${NATIONS[wearing].adjective} colours, and let them take the blame`,
+      );
       return OK;
     }
 

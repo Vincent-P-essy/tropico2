@@ -59,6 +59,19 @@ function updateCaptiveUnrest(state: GameState, person: Person, days: number): vo
   if (person.mood > CAPTIVE_ESCAPE) return;
   if (person.courage < ESCAPE_COURAGE) return;
 
+  // Informants earn their keep here: the player is told who is thinking about
+  // it while there is still time to press-gang, ransom or frighten them.
+  if (
+    state.standing.some((e) => e.edict === "payForInformants") &&
+    person.mood <= CAPTIVE_ESCAPE * 0.7 &&
+    state.rng.chance(0.02 * days)
+  ) {
+    notify(state, "warning", `An informant says ${person.name} is planning to run`, {
+      x: person.x,
+      y: person.y,
+    });
+  }
+
   // Guards on the roads make running a worse idea.
   const guards = countGuards(state);
   const deterrence = 1 / (1 + guards * 0.22);
