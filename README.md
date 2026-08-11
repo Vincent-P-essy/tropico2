@@ -146,7 +146,7 @@ that was painting a third of the island black got caught._
 ```bash
 npm install
 npm run dev          # play it at localhost:5173
-npm test             # 342 tests, no browser needed
+npm test             # 376 tests, no browser needed
 npm run typecheck
 npm run lint
 npm run screenshot   # boots the real game headless and photographs it

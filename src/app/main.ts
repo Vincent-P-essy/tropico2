@@ -18,11 +18,14 @@ import {
   removeBuilding,
 } from "../sim/state.ts";
 import type { GameState } from "../sim/types.ts";
+import { EdictsPanel } from "../ui/edicts-panel.ts";
 import { FleetPanel } from "../ui/fleet-panel.ts";
 import { Hud, type Selection } from "../ui/hud.ts";
 import { buildShip, crewShip, launch, loadShip, recall, recruitCaptain } from "../sim/fleet.ts";
 import { loadFromSlot, saveToSlot } from "../sim/save.ts";
 import { evaluateScenario } from "../sim/objectives.ts";
+import { cancel as cancelEdict, issue as issueEdict } from "../sim/edicts.ts";
+import { buy as buyGoods, sell as sellGoods } from "../sim/trade.ts";
 
 /**
  * Boot, input and the game loop.
@@ -138,6 +141,26 @@ const fleet = new FleetPanel(fleetRoot, {
   },
 });
 
+const edictRoot = document.createElement("div");
+uiRoot.append(edictRoot);
+const edicts = new EdictsPanel(edictRoot, {
+  onIssue: (id, ctx) => {
+    const result = issueEdict(state, id, ctx);
+    if (!result.ok) notify(state, "warning", result.reason ?? "That cannot be done");
+  },
+  onCancel: (id, nation) => {
+    cancelEdict(state, id, nation);
+  },
+  onSell: (good, amount) => {
+    const result = sellGoods(state, good, amount);
+    if (!result.ok) notify(state, "warning", result.reason ?? "Nobody is buying");
+  },
+  onBuy: (good, amount) => {
+    const result = buyGoods(state, good, amount);
+    if (!result.ok) notify(state, "warning", result.reason ?? "Nobody is selling");
+  },
+});
+
 // Open on the settlement rather than a corner of the sea.
 const start = findStartSite(state.island, 9);
 camera.lookAt(start.x + 4, start.y + 4);
@@ -217,6 +240,7 @@ window.addEventListener("keydown", (event) => {
     return;
   }
   if (event.key === "f" || event.key === "F") fleet.toggle();
+  if (event.key === "e" || event.key === "E") edicts.toggle();
   if (event.key === "s" && (event.ctrlKey || event.metaKey)) {
     event.preventDefault();
     notify(state, saveToSlot(state, "quick") ? "good" : "warning", "Saved");
@@ -304,6 +328,8 @@ function frame(now: number): void {
 
   hud.update(state, selection);
   fleet.update(state);
+  edicts.setTarget(selection?.kind === "person" ? { kind: "person", id: selection.id } : null);
+  edicts.update(state);
   requestAnimationFrame(frame);
 }
 
@@ -341,6 +367,7 @@ declare global {
       zoom: (value: number) => void;
       setOverlay: (value: Overlay) => void;
       toggleFleet: () => void;
+      toggleEdicts: () => void;
       save: () => boolean;
       hasSave: () => boolean;
       objectives: () => { label: string; done: boolean; detail: string }[];
@@ -352,6 +379,9 @@ window.tropico = {
   state: () => state,
   toggleFleet: () => {
     fleet.toggle();
+  },
+  toggleEdicts: () => {
+    edicts.toggle();
   },
   save: () => saveToSlot(state, "quick"),
   hasSave: () => loadFromSlot("quick") !== null,
