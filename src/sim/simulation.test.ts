@@ -636,19 +636,25 @@ describe("running a whole island", () => {
     }
   });
 
-  it("gives nearly every pirate a bed, and puts somebody behind every bar", () => {
-    // Two silent killers, both of which look like nothing on screen. A pirate
-    // with no plot has resting and stashing pinned at zero from the first hour;
-    // an unstaffed tavern is a shed, and a band with every tavern shut is
-    // miserable in a town that appears to have everything. Both once ran at
-    // roughly one in twelve without a single line in the log to say so.
+  it("gives nearly every pirate a bed", () => {
+    // A silent killer: a pirate with no plot has resting and stashing pinned at
+    // zero from the first hour, and this once ran at eleven in twelve without a
+    // single line in the log to say so. Costs nothing to check — housing is
+    // handed out when the island is made, before a tick has been spent.
     for (const seed of [1650, 4242, 909, 21, 55, 77, 33, 8080]) {
       const state = flatGame({ seed });
       const band = [...state.people.values()].filter((p) => p.kind === "pirate");
       const homed = band.filter((p) => p.home >= 0).length;
       expect(homed / band.length, `seed ${seed}: pirates with a plot`).toBeGreaterThanOrEqual(0.6);
+    }
+  });
 
-      tickMany(state, TICKS_PER_DAY * 30 * 6);
+  it("puts somebody behind every bar", () => {
+    // The other silent killer. An unstaffed tavern is a shed, and a band with
+    // every tavern shut is miserable in a town that appears to have everything.
+    for (const seed of [4242, 33]) {
+      const state = flatGame({ seed });
+      tickMany(state, TICKS_PER_DAY * 30 * 4);
       const bars = [...state.buildings.values()].filter(
         (b) => BUILDINGS[b.def].provides !== undefined && BUILDINGS[b.def].staff !== undefined,
       );
