@@ -18,10 +18,12 @@ import {
   removeBuilding,
 } from "../sim/state.ts";
 import type { GameState } from "../sim/types.ts";
+import { Almanac } from "../ui/almanac.ts";
 import { EdictsPanel } from "../ui/edicts-panel.ts";
 import { recordMedal, StartScreen } from "../ui/start-screen.ts";
 import { FleetPanel } from "../ui/fleet-panel.ts";
 import { Hud, type Selection } from "../ui/hud.ts";
+import { assignToBuilding, release as releaseWorker } from "../sim/employment.ts";
 import { buildShip, crewShip, launch, loadShip, recall, recruitCaptain } from "../sim/fleet.ts";
 import { loadFromSlot, saveToSlot } from "../sim/save.ts";
 import { evaluateScenario } from "../sim/objectives.ts";
@@ -60,6 +62,8 @@ const camera = new Camera();
 
 let speedIndex = 1;
 let picked: BuildingId | null = null;
+/** A quarter turn on the building being placed, toggled with R. */
+let rotation: 0 | 1 = 0;
 let overlay: Overlay = "none";
 let selection: Selection | null = null;
 let hover: { x: number; y: number } | null = null;
@@ -96,6 +100,21 @@ const hud = new Hud(uiRoot, {
   },
   onFocus: (x, y) => {
     camera.lookAt(x, y);
+  },
+  onAssign: (personId, buildingId) => {
+    const person = state.people.get(personId);
+    const building = state.buildings.get(buildingId);
+    if (!person || !building) return;
+    if (!assignToBuilding(state, person, building)) {
+      notify(state, "warning", `${person.name} cannot do that work`);
+    }
+  },
+  onRelease: (personId) => {
+    const person = state.people.get(personId);
+    if (person) releaseWorker(state, person);
+  },
+  onSelectPerson: (personId) => {
+    selection = { kind: "person", id: personId };
   },
 });
 
@@ -145,6 +164,12 @@ const fleet = new FleetPanel(fleetRoot, {
   onFocus: (x, y) => {
     camera.lookAt(x, y);
   },
+});
+
+const almanacRoot = document.createElement("div");
+uiRoot.append(almanacRoot);
+const almanac = new Almanac(almanacRoot, (x, y) => {
+  camera.lookAt(x, y);
 });
 
 const edictRoot = document.createElement("div");
@@ -267,7 +292,9 @@ window.addEventListener("keydown", (event) => {
     return;
   }
   if (event.key === "f" || event.key === "F") fleet.toggle();
+  if (event.key === "r" || event.key === "R") rotation = rotation === 0 ? 1 : 0;
   if (event.key === "e" || event.key === "E") edicts.toggle();
+  if (event.key === "a" || event.key === "A") almanac.toggle();
   if (event.key === "s" && (event.ctrlKey || event.metaKey)) {
     event.preventDefault();
     notify(state, saveToSlot(state, "quick") ? "good" : "warning", "Saved");
@@ -309,7 +336,7 @@ function handleClick(x: number, y: number): void {
 }
 
 function placeBuilding(id: BuildingId, x: number, y: number): void {
-  const check = canPlace(state, id, x, y);
+  const check = canPlace(state, id, x, y, rotation);
   if (!check.ok) {
     notify(state, "warning", check.reason ?? "Cannot build there", { x, y });
     return;
@@ -319,7 +346,13 @@ function placeBuilding(id: BuildingId, x: number, y: number): void {
   state.lumber -= cost.lumber;
   state.treasury -= cost.gold;
   const hours = constructionHours(id);
-  addBuilding(state, id, x, y, hours <= 0 ? { instant: true } : { constructionHours: hours });
+  addBuilding(
+    state,
+    id,
+    x,
+    y,
+    hours <= 0 ? { instant: true, rotation } : { constructionHours: hours, rotation },
+  );
 
   // Roads and free structures stay on the cursor so a run of them is one drag.
   if (BUILDINGS[id].lumber <= 1 && BUILDINGS[id].gold === 0) return;
@@ -343,14 +376,17 @@ function frame(now: number): void {
     for (let i = 0; i < steps; i++) tick(state, 1);
   }
 
-  const ghostValid = hover ? hud.showPlacement(state, picked, hover.x, hover.y) : false;
+  const ghostValid = hover ? hud.showPlacement(state, picked, hover.x, hover.y, rotation) : false;
 
   render(ctx, state, camera, atlas, {
     overlay,
     time: elapsed,
     selected: selection?.kind === "building" ? selection.id : undefined,
     hovered: hover ?? undefined,
-    ghost: picked && hover ? { def: picked, x: hover.x, y: hover.y, valid: ghostValid } : undefined,
+    ghost:
+      picked && hover
+        ? { def: picked, x: hover.x, y: hover.y, valid: ghostValid, rotation }
+        : undefined,
   });
 
   if (state.status === "won" && state.medal && state.scenario) {
@@ -361,6 +397,7 @@ function frame(now: number): void {
   fleet.update(state);
   edicts.setTarget(selection?.kind === "person" ? { kind: "person", id: selection.id } : null);
   edicts.update(state);
+  almanac.update(state);
   requestAnimationFrame(frame);
 }
 
@@ -399,6 +436,7 @@ declare global {
       setOverlay: (value: Overlay) => void;
       toggleFleet: () => void;
       toggleEdicts: () => void;
+      toggleAlmanac: () => void;
       save: () => boolean;
       hasSave: () => boolean;
       objectives: () => { label: string; done: boolean; detail: string }[];
@@ -413,6 +451,9 @@ window.tropico = {
   },
   toggleEdicts: () => {
     edicts.toggle();
+  },
+  toggleAlmanac: () => {
+    almanac.toggle();
   },
   save: () => saveToSlot(state, "quick"),
   hasSave: () => loadFromSlot("quick") !== null,
