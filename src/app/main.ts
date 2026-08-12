@@ -239,18 +239,64 @@ if (!chosenByUrl) {
   );
 }
 
+/**
+ * How many pixels are actually drawn, per pixel of screen.
+ *
+ * Starts at whatever the display asks for and comes down if the machine cannot
+ * keep up. A modest laptop draws a 1080p canvas in about seventeen milliseconds;
+ * a slower one, a larger screen or a display at 150% scaling will not, and the
+ * honest answer there is fewer pixels rather than fewer frames. Nobody notices
+ * a fifteen per cent drop in a scene of flat colour; everybody notices a stutter.
+ *
+ * Declared above the first resize() rather than beside it: a `let` is not
+ * hoisted, so reading it from a function called earlier in the module throws.
+ * Chrome happened to be running an older bundle and said nothing; Firefox said
+ * exactly what was wrong, which is the whole argument for testing in both.
+ */
+let renderScale = 1;
+
+/** Frame times, most recent last, for deciding whether the scale is right. */
+const recentFrames: number[] = [];
+
 resize();
 window.addEventListener("resize", resize);
 
 function resize(): void {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  canvas.width = Math.floor(window.innerWidth * dpr);
-  canvas.height = Math.floor(window.innerHeight * dpr);
+  const dpr = Math.min(window.devicePixelRatio || 1, 2) * renderScale;
+  canvas.width = Math.max(1, Math.floor(window.innerWidth * dpr));
+  canvas.height = Math.max(1, Math.floor(window.innerHeight * dpr));
   canvas.style.width = `${window.innerWidth}px`;
   canvas.style.height = `${window.innerHeight}px`;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   camera.viewWidth = window.innerWidth;
   camera.viewHeight = window.innerHeight;
+}
+
+/**
+ * Trades resolution for smoothness, both ways.
+ *
+ * Judged on the median of the last couple of seconds rather than on any one
+ * frame: a single slow frame is a garbage collection or a tab regaining focus,
+ * and reacting to it would make the picture flicker between resolutions.
+ */
+function adaptQuality(frameMs: number): void {
+  recentFrames.push(frameMs);
+  if (recentFrames.length < 120) return;
+  recentFrames.splice(0, recentFrames.length - 120);
+
+  const sorted = [...recentFrames].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
+
+  // Below 45 frames a second, give up some pixels. Comfortably above 58, take
+  // them back — but never past what the display actually has.
+  const before = renderScale;
+  if (median > 22 && renderScale > 0.6) renderScale = Math.max(0.6, renderScale - 0.15);
+  else if (median < 14 && renderScale < 1) renderScale = Math.min(1, renderScale + 0.15);
+
+  if (renderScale !== before) {
+    recentFrames.length = 0;
+    resize();
+  }
 }
 
 // ── Input ───────────────────────────────────────────────────────────────────
@@ -401,6 +447,7 @@ function placeBuilding(id: BuildingId, x: number, y: number): void {
 
 function frame(now: number): void {
   const dt = Math.min(0.25, (now - lastFrame) / 1000);
+  adaptQuality(now - lastFrame || 16);
   lastFrame = now;
   elapsed += dt;
 

@@ -17,7 +17,8 @@
     "screenshot": "node scripts/screenshot.mjs",
     "resume": "node scripts/resume.mjs",
     "audio": "node scripts/audio.mjs",
-    "profile": "node scripts/profile.mjs"
+    "profile": "node scripts/profile.mjs",
+    "browsers": "node scripts/browsers.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

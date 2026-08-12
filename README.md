@@ -204,6 +204,7 @@ npm run screenshot   # boots the real game headless and photographs it
 npm run resume       # plays, saves, reloads the page, and goes back to it
 npm run audio        # renders the music offline and measures the samples
 npm run profile      # times real frames on whatever machine it is run on
+npm run browsers     # runs it in Chrome and in Firefox and checks it drew
 ```
 
 `npm run screenshot` doubles as the end-to-end test: it plays twenty months in
@@ -250,6 +251,9 @@ kind of mistake — a rule that was locally reasonable and globally fatal:
 - The log **said the same thing six times** while the news was scrolling off the
   top. An unhappy island brawls constantly; three captives starving to death
   went unread underneath it.
+- A `let` was read before it was declared, so the whole game was a blank page —
+  in Firefox. Chrome had cached its way past it and said nothing, which is the
+  entire argument for `npm run browsers`.
 - The powers never came. Relations, forts, guards and the patron edict all led
   to an invasion that **nothing ever called**, so three nations could spend a
   decade at war with the haven without one sail on the horizon.
