@@ -132,7 +132,39 @@ way that leaves the mechanic intact:
 4. **No arbitrary campaign locks.** Episodes constrain by resources and time,
    not by hiding the buildings you need to keep anyone happy.
 
-## How it is built
+## The music
+
+There are no audio files here either. The soundtrack is written a bar at a time
+by `audio/score.ts` — which note, which drum, which sixteenth — and played by
+oscillators and filtered noise in `audio/synth.ts`. Between them they come to
+about four hundred lines and nothing else.
+
+The style follows the original's, which is not the sea-shanty pastiche the
+subject suggests: Daniel Indart scored it as Afro-Caribbean percussion under
+Irish flute and fiddle, over a Spanish cadence. So there is a son clave, three
+strokes then two, with a conga tumbao answering it; a jig lilting in 6/8 over
+the top; and the Andalusian cadence underneath, which is what makes a pirate
+island in the Caribbean sound like neither Ireland nor Cuba and unmistakably
+like both.
+
+What the original could not do is listen back. The music here reads the island:
+the tune is on the flute while the band is content and passes to the fiddle when
+it is not, the mode drops from Dorian to Phrygian as things get dangerous, the
+shaker only comes in when there is something to be tense about, and the tempo
+follows. It is written from the island's own seed, so a given haven always
+sounds like itself — but never from the simulation's generator, or turning the
+sound on would change how the island plays.
+
+Music is the one thing here that cannot be checked by reading the output, and
+"no console errors" is not evidence that anything was heard. So `npm run audio`
+renders it through an `OfflineAudioContext` in headless Chromium and measures
+the samples: silence, clipping, a stuck tone and a diverging filter all fail
+there. All four are what a broken synthesiser actually produces, and the last
+one is what this one did — a feedback loop with a resonant peak turned a plucked
+string into an exponential and filled the buffer with values that were not
+numbers, silently taking every other instrument with it.
+
+## What it costs to run
 
 ```
 core/    seeded RNG, tile grid, typed-array fields, isometric projection, A*
@@ -170,6 +202,8 @@ npm run typecheck
 npm run lint
 npm run screenshot   # boots the real game headless and photographs it
 npm run resume       # plays, saves, reloads the page, and goes back to it
+npm run audio        # renders the music offline and measures the samples
+npm run profile      # times real frames on whatever machine it is run on
 ```
 
 `npm run screenshot` doubles as the end-to-end test: it plays twenty months in

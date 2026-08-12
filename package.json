@@ -15,7 +15,9 @@
     "format:fix": "prettier --write .",
     "typecheck": "tsc -b",
     "screenshot": "node scripts/screenshot.mjs",
-    "resume": "node scripts/resume.mjs"
+    "resume": "node scripts/resume.mjs",
+    "audio": "node scripts/audio.mjs",
+    "profile": "node scripts/profile.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
