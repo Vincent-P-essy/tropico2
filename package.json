@@ -18,7 +18,8 @@
     "resume": "node scripts/resume.mjs",
     "audio": "node scripts/audio.mjs",
     "profile": "node scripts/profile.mjs",
-    "browsers": "node scripts/browsers.mjs"
+    "browsers": "node scripts/browsers.mjs",
+    "figures": "node scripts/figures.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
