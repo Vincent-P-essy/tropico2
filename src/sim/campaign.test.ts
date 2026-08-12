@@ -51,7 +51,16 @@ describe("the campaign", () => {
     expect(scenario).toBeDefined();
     if (!scenario) return;
     const state = startScenario(scenario, 1650);
-    tickMany(state, TICKS_PER_MONTH * 14);
+    // The clock is what is under test, so nothing else may end the run first:
+    // an episode this long can lose its captives to a rebellion on the way and
+    // then the assertion is about the wrong ending entirely.
+    for (const person of state.people.values()) person.mood = 90;
+    for (let month = 0; month < 14; month++) {
+      tickMany(state, TICKS_PER_MONTH);
+      for (const person of state.people.values()) {
+        if (person.activity !== "dead") person.mood = 90;
+      }
+    }
     expect(state.status).toBe("lost");
     expect(state.ending).toContain("time ran out");
   });

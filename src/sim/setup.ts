@@ -4,6 +4,7 @@ import { findPath, floodFill, octile } from "../core/path.ts";
 import { BUILDINGS, type BuildingId } from "../data/buildings.ts";
 import type { GoodId } from "../data/goods.ts";
 import { SKILLED_JOBS } from "../data/jobs.ts";
+import { CAPTAINS } from "../data/captains.ts";
 import { NATION_IDS } from "../data/nations.ts";
 import type { Scenario } from "../data/scenarios.ts";
 import { monthIndex } from "../data/scenarios.ts";
@@ -14,8 +15,17 @@ import { autoAssign } from "./employment.ts";
 import { allocateHousing } from "./game.ts";
 import { findStartSite, isBuildable, isCoast } from "./island.ts";
 import { spawnCaptive, spawnPirate } from "./people.ts";
-import { addBuilding, createState, notify, removeBuilding, type NewGameOptions } from "./state.ts";
+import {
+  addBuilding,
+  countBuildings,
+  createState,
+  isRoad,
+  notify,
+  removeBuilding,
+  type NewGameOptions,
+} from "./state.ts";
 import { buildShip, freeDocks } from "./fleet.ts";
+import type { ShipClassId } from "../data/ships.ts";
 import type { GameState, King } from "./types.ts";
 
 /**
@@ -33,6 +43,8 @@ export interface StartOptions extends NewGameOptions {
   goods?: Partial<Record<GoodId, number>>;
   /** Skilled captives to begin with, beyond whatever the king's traits grant. */
   professions?: readonly string[];
+  /** Hulls already in the water. Free play gets a sloop; episodes say their own. */
+  ships?: readonly ShipClassId[];
 }
 
 /** Lays the opening settlement and populates it. */
@@ -56,8 +68,31 @@ export function newGame(options: StartOptions): GameState {
   const captiveCount = options.captives ?? 34;
   layOpeningSettlement(state, site.x, site.y, pirateCount, captiveCount);
 
+  /*
+   * One of them can command, because otherwise none of this works.
+   *
+   * A ship will not sail without a captain, and a captain is bought for fifteen
+   * hundred gold you do not have on the first morning. Twelve of the sixteen
+   * campaign episodes hand you a ship, and every one of those ships sat at her
+   * dock for the whole game with nobody to take her out — silently, the same
+   * way the invasion sat in a function nothing called.
+   *
+   * A band of pirates has a captain. That is what a band of pirates is.
+   */
+  const commander = state.rng.pick(CAPTAINS);
   for (let i = 0; i < pirateCount; i++) {
     const spot = scatter(state, site.x, site.y);
+    if (i === 0 && commander) {
+      const captain = spawnPirate(state, {
+        x: spot.x,
+        y: spot.y,
+        sex: commander.sex,
+        nationality: commander.nationality,
+        captainId: commander.id,
+      });
+      captain.name = commander.name;
+      continue;
+    }
     spawnPirate(state, { x: spot.x, y: spot.y });
   }
 
@@ -90,6 +125,7 @@ export function newGame(options: StartOptions): GameState {
     });
   }
 
+  giveHerAShip(state, options.ships ?? ["sloop"]);
   autoAssign(state);
   allocateHousing(state);
   return state;
@@ -107,6 +143,8 @@ export function startScenario(scenario: Scenario, seed: number, king?: King): Ga
     pirates: scenario.resources.pirates,
     captives: scenario.resources.captives,
     goods: scenario.resources.goods,
+    // The episode says what it puts in the water, and some episodes say nothing.
+    ships: scenario.resources.ships,
   });
 
   state.scenario = scenario;
@@ -124,8 +162,26 @@ export function startScenario(scenario: Scenario, seed: number, king?: King): Ga
     if (asked.has(building.def)) removeBuilding(state, building.id);
   }
 
-  // And the ships it starts you with are already in the water.
-  for (const cls of scenario.resources.ships) {
+  notify(state, "info", `${scenario.name}: ${scenario.briefing}`);
+  return state;
+}
+
+/**
+ * The hull you begin with, tied up and ready.
+ *
+ * The original hands you one and expects you to use it: its own advice is that
+ * the second thing to do on any island is to send the starting ship out, and
+ * again, about ten times, before the band's mood needs looking at. That is not
+ * a flourish, it is the shape of the game. A pirate aboard costs the island
+ * nothing — his needs are met at sea — while a pirate ashore wants feeding,
+ * drink, a game and company, and twelve of them ashore will empty any opening
+ * settlement's taverns and sit at eighteen per cent happiness for ever.
+ *
+ * Without her the haven has no income at all, and the log fills with the
+ * treasury going unpaid while the player wonders what they did wrong.
+ */
+function giveHerAShip(state: GameState, classes: readonly ShipClassId[]): void {
+  for (const cls of classes) {
     const berth = freeDocks(state)[0];
     const ship = buildShip(state, cls, -1);
     if (!ship) continue;
@@ -133,9 +189,16 @@ export function startScenario(scenario: Scenario, seed: number, king?: King): Ga
     ship.status = berth === undefined ? "building" : "inPort";
     if (berth !== undefined) ship.dock = berth;
   }
+}
 
-  notify(state, "info", `${scenario.name}: ${scenario.briefing}`);
-  return state;
+/** Takes up any road under a rectangle, so something else can stand there. */
+function liftRoads(state: GameState, rect: Rect): void {
+  for (const building of [...state.buildings.values()]) {
+    if (building.def !== "road") continue;
+    if (building.x < rect.x || building.x >= rect.x + rect.w) continue;
+    if (building.y < rect.y || building.y >= rect.y + rect.h) continue;
+    removeBuilding(state, building.id);
+  }
 }
 
 /** A free tile near the settlement, for dropping a person onto. */
@@ -230,11 +293,65 @@ function layOpeningSettlement(
 
   // And then count them, because wanting a farm is not the same as having one.
   guaranteeFood(state, origin, farms, kitchens);
-  stockTheLarder(state);
 
   // The timber chain: the camp goes where the trees are, the mill on the grid.
   placeOnResource(state, "timberCamp", ox, oy, 22, (x, y) => state.island.forest.get(x, y));
   placeOnGrid(state, "sawmill", origin, ox - 6, oy + 6);
+
+  /*
+   * And then check, because lumber is the whole economy.
+   *
+   * Almost nothing in this game costs gold; nearly everything costs lumber, so
+   * an island whose sawmill found nowhere to stand cannot build a single thing
+   * for the rest of the game. It happened on four coastlines in twelve and the
+   * only sign was a lumber counter that never moved. The camp is no better off
+   * without a mill to send its wood to.
+   */
+  for (let attempt = 1; countBuildings(state, "sawmill") === 0 && attempt <= 10; attempt++) {
+    if (!placeOnGrid(state, "sawmill", origin, ox, oy + 4, 10 + attempt * 4)) break;
+  }
+  for (let attempt = 1; countBuildings(state, "timberCamp") === 0 && attempt <= 10; attempt++) {
+    const placed = placeOnResource(state, "timberCamp", ox, oy, 22 + attempt * 4, (x, y) =>
+      Math.max(0.02, state.island.forest.get(x, y)),
+    );
+    if (!placed && !placeOnGrid(state, "timberCamp", origin, ox, oy, 14 + attempt * 4)) break;
+  }
+
+  /*
+   * The dock: after the food and the lumber, before the pirates' own quarter.
+   *
+   * Nothing on this island pays for itself until something of yours is at sea,
+   * and nothing gets to sea without somewhere to tie up — but a dock is five
+   * tiles by four, and laid early it takes the best flat ground by the water,
+   * pushes the farms further out and lengthens every walk the corn has to make.
+   * Laid last, as it once was, it could not find a site at all on five
+   * coastlines in eight and the haven could never earn a penny.
+   *
+   * So: the people eat, the mill gets its wood, and then the sea. The quarter
+   * spreads around whatever is left, which is what a quarter is for.
+   */
+  for (let attempt = 0; attempt < 10; attempt++) {
+    if (countBuildings(state, "dock") > 0) break;
+    // Roads are the last thing that should stand between a haven and the sea,
+    // so on the later attempts the dock is allowed to take a site the lattice
+    // is sitting on and the road comes back up. Without this the coast can be
+    // fully paved and entirely unusable: three islands in ten had no dock,
+    // therefore no ship, therefore no income, from the first morning.
+    const shore = findCoastSite(state, ox, oy, attempt, attempt >= 4);
+    if (!shore) break;
+    liftRoads(state, { x: shore.x, y: shore.y, w: 5, h: 4 });
+    if (placeAt(state, "dock", shore.x, shore.y)) {
+      runSpur(state, ox, oy, shore.x + 2, shore.y - 1);
+      // Taking up road to make room can cut the lattice in two, which strands
+      // whatever was on the far side of it.
+      joinLatticeFragments(state, ox, oy);
+    }
+  }
+
+  // A plot each. A pirate with nowhere to live has two of his six needs at zero
+  // from the first hour and is on his way to deserting before the player has
+  // done anything wrong.
+  layQuarter(state, "pirateHousing", ox, oy, pirateCount);
 
   // Somewhere for the pirates to eat, drink, gamble and find company. A Wench &
   // Masseuse serves exactly one pirate at a time, which is why the original's
@@ -243,11 +360,6 @@ function layOpeningSettlement(
   placeOnGrid(state, "smugglersDive", origin, ox - 6, oy - 4);
   placeOnGrid(state, "animalPit", origin, ox + 9, oy - 4);
   for (let i = 0; i < 4; i++) placeOnGrid(state, "wenchMasseuse", origin, ox - 2 + i * 3, oy - 8);
-
-  // A plot each. A pirate with nowhere to live has two of his six needs at zero
-  // from the first hour and is on his way to deserting before the player has
-  // done anything wrong.
-  layQuarter(state, "pirateHousing", ox, oy, pirateCount);
 
   // Order and fear where the captives work; defense and anarchy where the
   // pirates are. This is the zoning lesson the whole game is about, laid out
@@ -274,16 +386,14 @@ function layOpeningSettlement(
   // And a church, because two years in they will ask for one.
   placeOnGrid(state, "church", origin, ox - 7, oy + 3);
 
+  // Last of all, fill what has been built. Anything stocked before this point
+  // would have been stocked before it existed.
+  stockTheLarder(state);
+
   // Lumber gates everything the player can build, so the timber chain outbids
   // the rest of the island for the captives it needs.
   for (const building of state.buildings.values()) {
     if (building.def === "timberCamp" || building.def === "sawmill") building.priority = "high";
-  }
-
-  const shore = findCoastSite(state, ox, oy);
-  if (shore) {
-    runSpur(state, ox, oy, shore.x + 2, shore.y - 1);
-    placeAt(state, "dock", shore.x, shore.y);
   }
 }
 
@@ -578,6 +688,16 @@ function stockTheLarder(state: GameState): void {
       }
     }
     if (def.serves) addStock(building, servedGood(def), stockCap(building.def));
+
+    // And the dock is provisioned, because a ship will not sail without food
+    // aboard and there is no way to make any on the first morning. A haven with
+    // a hull tied up has barrels on the quay; without them the starting ship
+    // never leaves, the pirates all stay ashore, and the mood the original
+    // expects to hold above fifty per cent sits at fifteen instead.
+    if (building.def === "dock") {
+      addStock(building, "seaRations", stockCap(building.def));
+      addStock(building, "cutlasses", stockCap(building.def) * 0.5);
+    }
   }
 }
 
@@ -718,10 +838,13 @@ function layQuarter(
   wanted: number,
 ): number {
   const def = BUILDINGS[defId];
-  // The quarter is allowed to spread further than the working town. Somebody
-  // walks to the kitchen every day and to his own bed rather less often, so a
-  // house on the edge costs far less than a chuck tent on the edge would.
-  const { x0, x1, y0, y1 } = buildableExtent(state, ox, oy, 24);
+  // The quarter is allowed to spread further than the working town, and further
+  // again if it must. Somebody walks to the kitchen every day and to his own bed
+  // rather less often, so a house on the edge costs far less than a chuck tent
+  // on the edge would — and a pirate with no bed at all has two of his six needs
+  // pinned at zero for the whole game, which costs more than any walk.
+  let { x0, x1, y0, y1 } = buildableExtent(state, ox, oy, 24);
+  let reach = 24;
   let placed = 0;
 
   /*
@@ -744,7 +867,15 @@ function layQuarter(
         if (!best || distance < best.distance) best = { x, y, distance };
       }
     }
-    if (!best) break;
+    if (!best) {
+      // Out of room at this distance. Go further out before giving up on
+      // anybody: the alternative is a pirate sleeping in the road for ever.
+      if (reach >= 44) break;
+      reach += 10;
+      ({ x0, x1, y0, y1 } = buildableExtent(state, ox, oy, reach));
+      rejected.clear();
+      continue;
+    }
 
     if (!paveTo(state, ox, oy, best.x - 1, best.y)) {
       // Unreachable by land; do not try this site again.
@@ -854,20 +985,39 @@ function fits(state: GameState, defId: BuildingId, x: number, y: number): boolea
   );
 }
 
-function findCoastSite(state: GameState, cx: number, cy: number): { x: number; y: number } | null {
-  let best: { x: number; y: number; distance: number } | null = null;
-  for (let y = cy - 20; y <= cy + 20; y++) {
-    for (let x = cx - 20; x <= cx + 20; x++) {
+/**
+ * Somewhere on the coast that a dock will fit.
+ *
+ * `skip` passes over that many of the nearest sites. Widening the search radius
+ * instead — which is what this did — is useless: the nearest site is still the
+ * nearest, so every retry picked the same one. And it kept failing for a reason
+ * of its own making, because the road run out to it was laid first and crossed
+ * the footprint. Eight attempts, one site, no dock, no income, and nothing in
+ * the log to say the island had been born unable to earn.
+ */
+function findCoastSite(
+  state: GameState,
+  cx: number,
+  cy: number,
+  skip = 0,
+  overRoads = false,
+): { x: number; y: number } | null {
+  const found: { x: number; y: number; distance: number }[] = [];
+  for (let y = cy - 26; y <= cy + 26; y++) {
+    for (let x = cx - 26; x <= cx + 26; x++) {
       const rect = { x, y, w: 5, h: 4 };
       const coastal = someTile(rect, (tx, ty) => isCoast(state.island, tx, ty));
       const clear = everyTile(
         rect,
-        (tx, ty) => isBuildable(state.island, tx, ty) && state.occupancy.get(tx, ty) < 0,
+        (tx, ty) =>
+          isBuildable(state.island, tx, ty) &&
+          (state.occupancy.get(tx, ty) < 0 || (overRoads && isRoad(state, tx, ty))),
       );
       if (!coastal || !clear) continue;
-      const distance = Math.hypot(x - cx, y - cy);
-      if (!best || distance < best.distance) best = { x, y, distance };
+      found.push({ x, y, distance: Math.hypot(x - cx, y - cy) });
     }
   }
-  return best ? { x: best.x, y: best.y } : null;
+  found.sort((a, b) => a.distance - b.distance);
+  const pick = found[Math.min(skip, found.length - 1)];
+  return pick ? { x: pick.x, y: pick.y } : null;
 }

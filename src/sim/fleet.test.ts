@@ -32,8 +32,9 @@ import type { GameState, Ship } from "./types.ts";
 /** An island with a dock, a yard, and a ship ready to sail. */
 function readyToSail(seed = 4242): { state: GameState; ship: Ship } {
   const state = newGame({ seed, islandSize: 48, treasury: 20_000 });
-  const dock =
-    finishedBuildings(state, "dock")[0] ?? addBuilding(state, "dock", 6, 6, { instant: true });
+  // A dock of this test's own. The island's is occupied by the sloop it starts
+  // with, and two hulls at one berth is not a thing.
+  const dock = addBuilding(state, "dock", 6, 6, { instant: true });
   const yard = addBuilding(state, "shipyard", dock.x, dock.y + 6, { instant: true });
 
   const ship = buildShip(state, "frigate", yard.id);
@@ -74,8 +75,9 @@ describe("building a fleet", () => {
 
   it("builds a hull with the shipwrights at the yard and berths her at a dock", () => {
     const state = newGame({ seed: 21, islandSize: 48, treasury: 9000 });
-    const dock =
-      finishedBuildings(state, "dock")[0] ?? addBuilding(state, "dock", 6, 6, { instant: true });
+    // A second dock: the island's own is already taken by the ship it starts
+    // with, and a hull needs a berth of its own.
+    const dock = addBuilding(state, "dock", 6, 6, { instant: true });
     const yard = addBuilding(state, "shipyard", dock.x, dock.y + 6, { instant: true });
     const shipwright = spawnPirate(state, { x: yard.x, y: yard.y });
     // Shipwrights are skilled captives; make one and put it to work by hand.
@@ -105,8 +107,9 @@ describe("building a fleet", () => {
       expect(seen.has(captain.captainId)).toBe(false);
       seen.add(captain.captainId);
     }
-    expect(seen.size).toBe(16);
-    // Seventeen would be one too many, and the treasury should have paid for it.
+    // Fifteen, not sixteen: the band you start with already has a captain, and
+    // he is one of the same sixteen. He is not on offer again.
+    expect(seen.size).toBe(15);
     expect(recruitCaptain(state)).toBeNull();
   });
 
@@ -123,8 +126,9 @@ describe("building a fleet", () => {
 describe("sailing", () => {
   it("refuses to sail without a captain, a crew or rations", () => {
     const state = newGame({ seed: 5, islandSize: 48 });
-    const dock =
-      finishedBuildings(state, "dock")[0] ?? addBuilding(state, "dock", 6, 6, { instant: true });
+    // A second dock: the island's own is already taken by the ship it starts
+    // with, and a hull needs a berth of its own.
+    const dock = addBuilding(state, "dock", 6, 6, { instant: true });
     const yard = addBuilding(state, "shipyard", dock.x, dock.y + 6, { instant: true });
     const ship = buildShip(state, "snow", yard.id);
     expect(ship).not.toBeNull();
@@ -181,12 +185,24 @@ describe("sailing", () => {
 
   it("costs the nation whose ships you take", () => {
     const { state, ship } = readyToSail(55);
-    // The Bay of Campeche is Spanish water and nothing else.
+    // The Bay of Campeche is Spanish water and nothing else. Relations start at
+    // the top under the default king, so there is nowhere for them to fall
+    // until they are brought down to something ordinary first.
+    state.nations.spain.relations = 40;
     const before = state.nations.spain.relations;
-    launch(state, ship, "cruise", "bayOfCampeche");
-    for (let day = 0; day < 300 && ship.status !== "inPort"; day++) {
-      tickMany(state, TICKS_PER_DAY);
+
+    // A cruise is not guaranteed to meet anybody, so she goes out until she
+    // does. Testing one voyage tests the dice, not the diplomacy.
+    for (let voyage = 0; voyage < 4 && state.stats.prizesTaken === 0; voyage++) {
+      crewShip(state, ship);
+      loadShip(state, ship);
+      launch(state, ship, "cruise", "bayOfCampeche");
+      for (let day = 0; day < 300 && ship.status !== "inPort"; day++) {
+        tickMany(state, TICKS_PER_DAY);
+      }
     }
+
+    expect(state.stats.prizesTaken).toBeGreaterThan(0);
     expect(state.nations.spain.relations).toBeLessThan(before);
   });
 
