@@ -52,7 +52,7 @@ const browser = await puppeteer.launch({
 
 try {
   const page = await browser.newPage();
-  await page.setViewport({ width: 1180, height: 760, deviceScaleFactor: 2 });
+  await page.setViewport({ width: 1180, height: 1120, deviceScaleFactor: 2 });
   await page.goto(`http://localhost:${port}/?seed=1650`, { waitUntil: "domcontentloaded" });
   await page.waitForFunction("window.tropico !== undefined", { timeout: 20000 });
 
@@ -65,9 +65,9 @@ try {
       document.body.style.background = "#c8b48a";
       const canvas = document.createElement("canvas");
       canvas.width = 1180;
-      canvas.height = 760;
+      canvas.height = 1120;
       canvas.style.width = "1180px";
-      canvas.style.height = "760px";
+      canvas.style.height = "1120px";
       document.body.append(canvas);
       const ctx = canvas.getContext("2d");
 
@@ -244,6 +244,20 @@ try {
 
       // A flat island under them, so elevation sampling gives a sane answer.
       const flat = { ...state, island: { ...state.island, elevation: { sample: () => 0 } } };
+
+      // A whole band of one rank, to show that no two pirates are the same man.
+      for (let i = 0; i < 10; i++) {
+        cast.push([
+          `Hand ${i + 1}`,
+          make({
+            id: 40 + i,
+            kind: "pirate",
+            sex: i === 3 || i === 7 ? "female" : "male",
+            nationality: ["england", "france", "spain"][i % 3],
+            rank: 1 + (i % 4),
+          }),
+        ]);
+      }
 
       const columns = 5;
       const cellW = 1180 / columns;

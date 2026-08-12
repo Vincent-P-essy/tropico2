@@ -150,8 +150,19 @@ the French, ochre and blood red for the Spanish — because the original's peopl
 are English, French or Spanish and it matters whose shipping you are taking. Sex
 decides the silhouette, because half the jobs on this island are open to one sex
 only, exactly as in the original. Rank decides the hat: a landsman has a
-kerchief, a quartermaster a bandana, a senior hand a tricorn, and a captain a
-plume he certainly did not pay for.
+kerchief, a quartermaster a bandana, a senior hand a tricorn with a skull on it,
+and a captain a plume he certainly did not pay for.
+
+**A pirate has to be a pirate at a glance**, and a coloured coat is not enough —
+put a captive in one and he is a captive in a coloured coat. What separates them
+is the outline: turned-down bucket boots, a broad belt with a brass buckle, a
+baldric across the chest, a sash at the waist, and the sailor's stripes under an
+open coat. Captives have none of it, and go barefoot in drab. You can tell the
+two populations apart across a crowded island without reading a thing.
+
+Then each pirate is his own man, settled from his id so he is the same every
+time you find him: a full beard or a forked one or none, an eye patch, a gold
+earring, a hook where a hand was, a peg where a leg was. Captains get a bird.
 
 What somebody is doing decides how they move. Legs alternate and arms
 counter-swing, offset by the person's own id so a crowd does not march in step.

@@ -87,7 +87,46 @@ interface Appearance {
   skeleton: boolean;
   /** What is in the working hand, if anything. */
   tool: "none" | "cutlass" | "musket" | "axe" | "tray";
+
+  /*
+   * The pirate kit.
+   *
+   * A pirate in a coloured coat is a man in a coloured coat. What makes one
+   * legible across a crowded island is the outline: turned-down boots, a broad
+   * belt, a baldric across the chest, and the marks of a life that has cost him
+   * something. These are settled from the person's own id, so a given pirate has
+   * the same beard and the same missing eye every time you look at him — which
+   * is what makes him findable rather than merely decorated.
+   */
+  pirate: boolean;
+  boots: boolean;
+  baldric: boolean;
+  sash: string | null;
+  beard: "none" | "stubble" | "full" | "forked";
+  patch: boolean;
+  earring: boolean;
+  peg: boolean;
+  hook: boolean;
+  stripes: string | null;
+  skull: boolean;
+  parrot: boolean;
 }
+
+/** The plain landsman's kit, which is to say none of it. */
+const NO_KIT = {
+  pirate: false,
+  boots: false,
+  baldric: false,
+  sash: null,
+  beard: "none",
+  patch: false,
+  earring: false,
+  peg: false,
+  hook: false,
+  stripes: null,
+  skull: false,
+  parrot: false,
+} as const;
 
 /** Who this person looks like — settled entirely by what they are. */
 function appearanceOf(person: Person): Appearance {
@@ -107,6 +146,7 @@ function appearanceOf(person: Person): Appearance {
       ragColour: "#cfcabb",
       skeleton: true,
       tool: "none",
+      ...NO_KIT,
     };
   }
 
@@ -130,6 +170,9 @@ function appearanceOf(person: Person): Appearance {
       ragColour: pick(RAGS, 4),
       skeleton: false,
       tool: toolFor(person),
+      ...NO_KIT,
+      // A captive who has been here long enough stops shaving.
+      beard: !female && person.id % 4 === 0 ? "stubble" : "none",
     };
   }
 
@@ -138,6 +181,25 @@ function appearanceOf(person: Person): Appearance {
   const rank = Math.max(0, Math.min(RANKS.length - 1, person.rank));
   const hat =
     person.captainId !== null ? "plumed" : rank >= 5 ? "tricorn" : rank >= 2 ? "bandana" : "rag";
+  // Everything below is decided once, by who this pirate is, so he looks the
+  // same every time the player finds him.
+  const roll = (salt: number, chance: number): boolean =>
+    ((person.id * 31 + salt * 17) % 100) / 100 < chance;
+
+  // Roughly half of them, not three in four: a band where everybody has a beard
+  // is a band of one man. And a beard the same near-black as the hair covers
+  // most of a face five pixels across, so it is drawn a shade lighter.
+  const beards: Appearance["beard"][] = [
+    "none",
+    "none",
+    "none",
+    "stubble",
+    "stubble",
+    "full",
+    "forked",
+  ];
+  const beard = female ? "none" : (beards[(person.id * 5 + 2) % beards.length] ?? "none");
+
   return {
     skin,
     coat: shade(cloth.coat, rank >= 4 ? 0.14 : 0),
@@ -149,6 +211,22 @@ function appearanceOf(person: Person): Appearance {
     ragColour: pick(RAGS, 4),
     skeleton: false,
     tool: toolFor(person),
+
+    pirate: true,
+    boots: true,
+    baldric: rank >= 1 || roll(1, 0.5),
+    sash: roll(2, 0.55) ? pick(["#9c2f2f", "#2f5f4a", "#6b3f7a", "#8a6a20"], 6) : null,
+    beard,
+    // Rarer than the picture books suggest, and worth more for being rare.
+    patch: roll(3, 0.16),
+    earring: roll(4, 0.4),
+    // A peg or a hook, never both: he has only had so much bad luck.
+    peg: !female && roll(5, 0.1),
+    hook: !female && !roll(5, 0.1) && roll(6, 0.09),
+    // The sailor's stripes, under the coat, on those who have not risen far.
+    stripes: rank < 4 && roll(7, 0.45) ? "#dfd6c2" : null,
+    skull: rank >= 3 || person.captainId !== null,
+    parrot: person.captainId !== null || (rank >= 5 && roll(8, 0.3)),
   };
 }
 
@@ -233,10 +311,40 @@ function drawLegs(ctx: CanvasRenderingContext2D, look: Appearance, pose: Pose): 
 
   for (const side of [-1, 1]) {
     const step = pose.swing * side * 1.8;
-    ctx.fillRect(side < 0 ? -2.2 : 0.4, top, 1.8, pose.sitting ? 4 : 6 - Math.abs(step) * 0.4);
+    const x = side < 0 ? -2.2 : 0.4;
+    const length = pose.sitting ? 4 : 6 - Math.abs(step) * 0.4;
+
+    // One leg may be a peg, and a peg does not wear a boot.
+    if (look.peg && side === 1) {
+      ctx.fillStyle = "#6b4a2c";
+      ctx.beginPath();
+      ctx.moveTo(x + 0.2, top);
+      ctx.lineTo(x + 1.6, top);
+      ctx.lineTo(x + 1.2, top + length);
+      ctx.lineTo(x + 0.6, top + length);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = look.legs;
+      continue;
+    }
+
+    ctx.fillRect(x, top, 1.8, length);
+
+    if (look.boots && !pose.sitting) {
+      // Turned-down bucket boots: the widest thing on a pirate below the belt,
+      // and most of what tells him apart from a man in a coloured coat.
+      ctx.fillStyle = "#3a2a1c";
+      ctx.fillRect(x - 0.7, top + length - 3.2, 3.2, 3.2 + step * 0.2);
+      ctx.fillStyle = shade("#3a2a1c", 0.3);
+      ctx.fillRect(x - 0.7, top + length - 3.2, 3.2, 0.9);
+      ctx.fillStyle = look.legs;
+    }
+
     if (!pose.sitting && Math.abs(step) > 0.3) {
       // The trailing foot lifts, which is what makes it a stride and not a slide.
-      ctx.fillRect((side < 0 ? -2.2 : 0.4) + step * 0.5, -1.2, 1.8, 1.2);
+      ctx.fillStyle = look.boots ? "#3a2a1c" : look.legs;
+      ctx.fillRect(x + step * 0.5, -1.2, 1.8, 1.2);
+      ctx.fillStyle = look.legs;
     }
   }
 }
@@ -260,7 +368,21 @@ function drawTorso(ctx: CanvasRenderingContext2D, look: Appearance, pose: Pose):
     return;
   }
 
-  // A sash or a shirt front, which is what tells the nations apart at a glance.
+  // The sailor's stripes, worn under an open coat.
+  if (look.stripes) {
+    ctx.fillStyle = look.stripes;
+    ctx.fillRect(-1.5, top + 0.6, 3, bottom - top - 0.6);
+    ctx.fillStyle = "#3a4a6a";
+    for (let band = 0; band < 3; band++) {
+      ctx.fillRect(-1.5, top + 1.4 + band * 1.7, 3, 0.8);
+    }
+  }
+
+  // A shirt front, which is what tells the nations apart at a glance — but not
+  // over the stripes. Collar, stripes, baldric and sash together is four things
+  // on a torso six pixels wide, and four things at that size is a smudge.
+  if (look.stripes && !pose.away) return;
+
   ctx.fillStyle = look.trim;
   if (pose.away) {
     ctx.fillRect(-2.4, top + 2.4, 4.8, 0.9);
@@ -277,6 +399,48 @@ function drawTorso(ctx: CanvasRenderingContext2D, look: Appearance, pose: Pose):
     ctx.closePath();
     ctx.fill();
   }
+
+  drawPirateKit(ctx, look, top, bottom);
+}
+
+/**
+ * Belt, baldric and sash.
+ *
+ * Three straight lines, and between them they do more for a pirate's outline
+ * than the coat does: the broad belt breaks the torso, the baldric cuts it on
+ * the diagonal, and the sash puts colour at the waist where nothing else is.
+ */
+function drawPirateKit(
+  ctx: CanvasRenderingContext2D,
+  look: Appearance,
+  top: number,
+  bottom: number,
+): void {
+  if (!look.pirate) return;
+
+  if (look.baldric) {
+    ctx.fillStyle = "#4a3220";
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(-2.9, top + 0.6);
+    ctx.lineTo(-1.5, top + 0.6);
+    ctx.lineTo(3.1, bottom - 0.4);
+    ctx.lineTo(1.7, bottom - 0.4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  if (look.sash) {
+    ctx.fillStyle = look.sash;
+    ctx.fillRect(-3.0, bottom - 2.2, 6.0, 1.6);
+  }
+
+  // The belt, and a buckle that catches the light.
+  ctx.fillStyle = "#2e2016";
+  ctx.fillRect(-3.0, bottom - 0.9, 6.0, 1.2);
+  ctx.fillStyle = "#c9a24a";
+  ctx.fillRect(-0.7, bottom - 0.9, 1.4, 1.2);
 }
 
 function drawArms(
@@ -300,9 +464,19 @@ function drawArms(
 
   if (behind) return;
 
-  // The hand, and whatever is in it.
+  // The hand, and whatever is in it — or the hook that replaced it.
   const handY = shoulder + (pose.work > 0 ? 3.6 : 5.6) + raise * 0.4;
   const handX = side * 3.4 + raise * 0.5;
+
+  if (look.hook) {
+    ctx.strokeStyle = "#c2c7ce";
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.arc(handX, handY + 1.2, 1.2, Math.PI * 0.9, Math.PI * 2.2);
+    ctx.stroke();
+    return;
+  }
+
   ctx.fillStyle = look.skin;
   ctx.fillRect(handX - 0.9, handY, 1.8, 1.4);
 
@@ -401,9 +575,76 @@ function drawHead(ctx: CanvasRenderingContext2D, look: Appearance, pose: Pose): 
     ctx.fillStyle = "rgba(28, 22, 16, 0.75)";
     ctx.fillRect(pose.facing * 0.3 - 1.4, y - 0.3, 0.8, 0.8);
     ctx.fillRect(pose.facing * 0.3 + 0.6, y - 0.3, 0.8, 0.8);
+
+    drawBeard(ctx, look, y);
+
+    if (look.patch) {
+      // Over one eye, with the strap running up under the hat.
+      ctx.fillStyle = "#1a1512";
+      ctx.fillRect(pose.facing * 0.3 - 1.7, y - 0.7, 1.5, 1.5);
+      ctx.fillRect(-2.7, y - 1.4, 5.4, 0.5);
+    }
+  }
+
+  if (look.earring) {
+    ctx.fillStyle = "#d8b04a";
+    ctx.beginPath();
+    ctx.arc(-2.6, y + 1.2, 0.75, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   drawHat(ctx, look, y);
+  if (look.parrot) drawParrot(ctx, y);
+}
+
+/** Beards, in the three lengths a life at sea produces. */
+function drawBeard(ctx: CanvasRenderingContext2D, look: Appearance, y: number): void {
+  if (look.beard === "none") return;
+  ctx.fillStyle = shade(look.hair, 0.22);
+
+  // A beard sits on the jaw and stops there. Drawn from just under the eyes to
+  // past the chin, as this once was, it swallows the face and the head becomes
+  // a dark blob with a hat on — which is not a pirate, it is a smudge.
+  if (look.beard === "stubble") {
+    ctx.globalAlpha = 0.45;
+    ctx.fillRect(-1.9, y + 1.1, 3.8, 1.3);
+    ctx.globalAlpha = 1;
+    return;
+  }
+
+  ctx.beginPath();
+  ctx.moveTo(-1.7, y + 1.2);
+  ctx.lineTo(1.7, y + 1.2);
+  ctx.lineTo(1.1, y + 2.8);
+  ctx.lineTo(-1.1, y + 2.8);
+  ctx.closePath();
+  ctx.fill();
+
+  if (look.beard === "forked") {
+    // Two plaited points below the chin: the Blackbeard of the woodcuts, at a
+    // length that still reads as a beard rather than as a bib.
+    ctx.fillRect(-1.2, y + 2.5, 0.9, 1.5);
+    ctx.fillRect(0.3, y + 2.5, 0.9, 1.5);
+  }
+}
+
+/** A bird on the shoulder, for those who have earned one. */
+function drawParrot(ctx: CanvasRenderingContext2D, y: number): void {
+  const x = 3.6;
+  const top = y + 1.6;
+  ctx.fillStyle = "#2f8f4a";
+  ctx.beginPath();
+  ctx.ellipse(x, top, 1.5, 2.1, 0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#d33a2a";
+  ctx.beginPath();
+  ctx.arc(x + 0.4, top - 1.8, 1, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#e6c14a";
+  ctx.fillRect(x + 1.1, top - 2, 0.9, 0.7);
+  // The tail, which is most of what says parrot at this size.
+  ctx.fillStyle = "#1f6f3a";
+  ctx.fillRect(x - 0.6, top + 1.6, 1, 3);
 }
 
 function drawHat(ctx: CanvasRenderingContext2D, look: Appearance, y: number): void {
@@ -445,6 +686,16 @@ function drawHat(ctx: CanvasRenderingContext2D, look: Appearance, y: number): vo
       ctx.lineTo(2.6, y - 1.8);
       ctx.closePath();
       ctx.fill();
+      if (look.skull) {
+        // The badge on the front of the hat, which is a skull and two bones at
+        // three pixels across: a pale blob and a bar is all it can be, and all
+        // it needs to be.
+        ctx.fillStyle = "#e8e4d8";
+        ctx.beginPath();
+        ctx.arc(0, y - 2.6, 0.85, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillRect(-1.1, y - 2, 2.2, 0.5);
+      }
       if (look.hat === "plumed") {
         ctx.strokeStyle = "#e4dcc6";
         ctx.lineWidth = 1;
