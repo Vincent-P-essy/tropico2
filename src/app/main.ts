@@ -5,7 +5,9 @@ import { Camera } from "../render/camera.ts";
 import { render, type Overlay } from "../render/renderer.ts";
 import { buildAtlas } from "../render/sprites.ts";
 import { constructionHours } from "../sim/economy.ts";
-import { tick } from "../sim/game.ts";
+import { captiveResignation, pirateHappiness, tick } from "../sim/game.ts";
+import { Sound } from "../audio/sound.ts";
+import type { Effect } from "../audio/synth.ts";
 import { findStartSite } from "../sim/island.ts";
 import { newGame, startScenario } from "../sim/setup.ts";
 import { CAMPAIGN } from "../data/scenarios.ts";
@@ -17,7 +19,7 @@ import {
   notify,
   removeBuilding,
 } from "../sim/state.ts";
-import type { GameState } from "../sim/types.ts";
+import type { GameState, NoticeKind } from "../sim/types.ts";
 import { Almanac } from "../ui/almanac.ts";
 import { EdictsPanel } from "../ui/edicts-panel.ts";
 import { recordMedal, StartScreen } from "../ui/start-screen.ts";
@@ -59,6 +61,10 @@ const seed = readSeed();
 let state: GameState = startingGame(seed);
 const atlas = buildAtlas();
 const camera = new Camera();
+
+// The music is written from the same seed as the island, so a given haven
+// always sounds like itself.
+const sound = new Sound(seed);
 
 let speedIndex = 1;
 let picked: BuildingId | null = null;
@@ -299,7 +305,18 @@ canvas.addEventListener(
   { passive: false },
 );
 
+/** One noise per kind of news, so the log can be heard as well as read. */
+const NOTICE_SOUNDS: Record<NoticeKind, Effect> = {
+  good: "good",
+  bad: "bad",
+  warning: "warning",
+  info: "coin",
+};
+
+let lastHeardNotice = -1;
+
 window.addEventListener("keydown", (event) => {
+  sound.start();
   const speedKeys: Record<string, number> = { " ": 0, "1": 1, "2": 2, "3": 3, "4": 4 };
   const speed = speedKeys[event.key];
   if (speed !== undefined) {
@@ -311,6 +328,9 @@ window.addEventListener("keydown", (event) => {
   if (event.key === "r" || event.key === "R") rotation = rotation === 0 ? 1 : 0;
   if (event.key === "e" || event.key === "E") edicts.toggle();
   if (event.key === "a" || event.key === "A") almanac.toggle();
+  if (event.key === "m" || event.key === "M") {
+    notify(state, "info", sound.toggleMute() ? "Sound off" : "Sound on");
+  }
   if (event.key === "s" && (event.ctrlKey || event.metaKey)) {
     event.preventDefault();
     notify(state, saveToSlot(state, "quick") ? "good" : "warning", "Saved");
@@ -328,6 +348,7 @@ window.addEventListener("keydown", (event) => {
 });
 
 function handleClick(x: number, y: number): void {
+  sound.start();
   if (picked) {
     placeBuilding(picked, x, y);
     return;
@@ -409,11 +430,38 @@ function frame(now: number): void {
     recordMedal(state.scenario.id, state.medal);
   }
 
+  followTheIsland();
   hud.update(state, selection);
   fleet.update(state);
   edicts.setTarget(selection?.kind === "person" ? { kind: "person", id: selection.id } : null);
   edicts.update(state);
   almanac.update(state);
+  /**
+   * Keeps the music and the noises in step with the island.
+   *
+   * The mood goes to the score, which leans the harmony and the tempo with it,
+   * and anything new in the log gets a noise — the log is already the game's own
+   * account of what just happened, so there is nothing to duplicate.
+   */
+  function followTheIsland(): void {
+    sound.setMood(pirateHappiness(state) / 100, dangerLevel(state));
+
+    const latest = state.notices.at(-1);
+    if (!latest || latest.id === lastHeardNotice) return;
+    lastHeardNotice = latest.id;
+    sound.play(NOTICE_SOUNDS[latest.kind]);
+  }
+
+  /** How close to the edge the island is, as the music hears it. */
+  function dangerLevel(current: GameState): number {
+    const unrest = 1 - Math.min(1, pirateHappiness(current) / 40);
+    const resented = captiveResignation(current) / 100;
+    const hunted = Object.values(current.nations).some((n) => n.knowsLocation && n.relations < -40)
+      ? 0.35
+      : 0;
+    return Math.min(1, unrest * 0.5 + resented * 0.35 + hunted);
+  }
+
   requestAnimationFrame(frame);
 }
 
