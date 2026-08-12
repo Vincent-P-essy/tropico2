@@ -4,19 +4,10 @@ import { anarchyAt, auraAt, auraModifiers, orderAt } from "../sim/auras.ts";
 import type { AuraId } from "../data/needs.ts";
 import { BEACH, DEEP_WATER, SHALLOW_WATER } from "../sim/island.ts";
 import { Ground } from "./ground.ts";
-import type { Building, GameState, Person, Ship } from "../sim/types.ts";
+import { drawPerson } from "./people.ts";
+import type { Building, GameState, Ship } from "../sim/types.ts";
 import type { Camera } from "./camera.ts";
-import {
-  alpha,
-  AURA_COLOR,
-  CAPTIVE_COLORS,
-  PIRATE_COLORS,
-  SEA_DEEP,
-  SEA_FOAM,
-  SEA_SHALLOW,
-  shade,
-  UI,
-} from "./palette.ts";
+import { alpha, AURA_COLOR, SEA_DEEP, SEA_FOAM, SEA_SHALLOW, shade, UI } from "./palette.ts";
 import { buildingSprite, terrainSprite, type SpriteAtlas } from "./sprites.ts";
 
 /**
@@ -425,48 +416,6 @@ function drawFootprintOutline(
 }
 
 /** A person: a small figure whose colour says which population they belong to. */
-function drawPerson(
-  ctx: CanvasRenderingContext2D,
-  state: GameState,
-  person: Person,
-  time: number,
-): void {
-  const elevation = state.island.elevation.sample(person.x, person.y);
-  const screen = tileToScreen(person.x, person.y, elevation);
-  const pirate = person.kind === "pirate";
-  const palette = pirate ? PIRATE_COLORS : CAPTIVE_COLORS;
-  const colour = palette[person.id % palette.length] ?? palette[0] ?? "#888";
-
-  // A gentle bob while walking, so movement is legible at a glance.
-  const moving = person.path.length > 0;
-  const bob = moving ? Math.abs(Math.sin(time * 7 + person.id)) * 2 : 0;
-
-  ctx.save();
-  ctx.fillStyle = "rgba(20, 16, 10, 0.28)";
-  ctx.beginPath();
-  ctx.ellipse(screen.x, screen.y + 1, 5, 2.6, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Body.
-  ctx.fillStyle = colour;
-  ctx.fillRect(screen.x - 3, screen.y - 11 - bob, 6, 9);
-  // Head.
-  ctx.fillStyle = "#e0c39a";
-  ctx.beginPath();
-  ctx.arc(screen.x, screen.y - 13.5 - bob, 3, 0, Math.PI * 2);
-  ctx.fill();
-  // A pirate wears something on his head; a captive does not.
-  if (pirate) {
-    ctx.fillStyle = shade(colour, -0.4);
-    ctx.fillRect(screen.x - 4.5, screen.y - 16 - bob, 9, 2);
-  }
-  // A hauler is carrying something.
-  if (person.carrying) {
-    ctx.fillStyle = "#a07c47";
-    ctx.fillRect(screen.x - 4, screen.y - 18 - bob, 8, 4);
-  }
-  ctx.restore();
-}
 
 /** A ship at her berth. */
 function drawShip(

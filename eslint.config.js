@@ -40,6 +40,7 @@ export default defineConfig(
         HTMLCanvasElement: "readonly",
         fetch: "readonly",
         performance: "readonly",
+        structuredClone: "readonly",
         requestAnimationFrame: "readonly",
         OfflineAudioContext: "readonly",
       },
