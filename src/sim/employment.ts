@@ -226,12 +226,31 @@ export function autoAssign(state: GameState): number {
 }
 
 /** Workers actually present and working, by job. */
+/**
+ * Who is at their post, by job.
+ *
+ * A hauler out fetching counts as present, and that is not a leniency — it is
+ * the difference between modelling the building and double-counting the walk.
+ * His job is to be away. Marking him missing while he does it halved every
+ * kitchen's output permanently: a chuck tent has a cook and a hauler, so with
+ * the hauler on the road it ran at one half for ever, which put two kitchens at
+ * nine bowls a day against thirty-six captives eating seven. That is a margin
+ * of two bowls, and on any island where the corn happened to be a few tiles
+ * further the walk got longer, the margin went negative and everybody starved -
+ * about one island in four, with nothing to distinguish it from the others.
+ *
+ * The corn he carries is already the constraint. Charging the building for the
+ * time he spends carrying it counts the same delay twice.
+ */
 export function presentWorkers(state: GameState, building: Building): Map<JobId, Person[]> {
   const byJob = new Map<JobId, Person[]>();
   for (const id of building.workers) {
     const person = state.people.get(id);
     if (!person?.job || person.activity === "dead") continue;
-    if (person.activity !== "working") continue;
+    const onAnErrand =
+      person.job.building === building.id &&
+      (person.activity === "fetching" || person.activity === "delivering");
+    if (person.activity !== "working" && !onAnErrand) continue;
     const list = byJob.get(person.job.job) ?? [];
     list.push(person);
     byJob.set(person.job.job, list);

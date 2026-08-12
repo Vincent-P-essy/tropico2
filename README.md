@@ -78,6 +78,12 @@ content in the middle of an orderly district.
 | A specific island  | add `?seed=1650` to the URL                                               |
 | A campaign episode | add `?episode=1` … `?episode=16`                                          |
 
+The second aim on any island, and the original's own advice, is to **send the
+ship out** — repeatedly. A pirate at sea costs the haven nothing, because his
+needs are met aboard; a pirate ashore wants feeding, drink, a game and company,
+and a dozen of them ashore will drink any opening settlement dry. So you begin
+with a hull tied up, a captain in the band and barrels on the quay.
+
 The first thing to understand is that **lumber is money**. Almost nothing costs
 gold; nearly everything costs lumber, so the timber camp → sawmill chain gates
 how fast you can grow. The second is that **nothing moves itself**: a brewery
@@ -240,6 +246,17 @@ kind of mistake — a rule that was locally reasonable and globally fatal:
   is mostly sea: **eleven of twelve pirates had no plot**, and so had resting and
   stashing at zero from the first hour. Frontage is now made rather than found —
   the road is routed out to a site before anything is built on it.
+- Twelve of the sixteen campaign episodes hand you a ship, and **not one of them
+  could ever sail**: a ship needs a captain, a captain costs fifteen hundred gold
+  you do not have on the first morning, and nothing put one in the starting band.
+  Every one of those hulls sat at her dock for the whole game.
+- The **dock could simply fail to be built** — it wants five clear tiles by four
+  on a coast, and it was laid after the pirates' quarter had built over the
+  shore. Five islands in eight had none, which means no ship, no plunder and no
+  income at all, from a game that is about plunder.
+- The **sawmill could fail the same way**, on four islands in twelve. Almost
+  nothing here costs gold and nearly everything costs lumber, so those islands
+  could never build anything again. The only sign was a counter that never moved.
 - The island **starved itself to death**, and only on some seeds — which is what
   made it so hard to see. The kitchens were crewed before the farms that fed
   them, the larders started empty against a twelve-day death clock, one farm

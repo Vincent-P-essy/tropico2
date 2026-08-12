@@ -74,7 +74,7 @@ export const SERVICE_FILL = 1;
 /** Below this feasting level a captive begins to starve. */
 export const STARVATION_THRESHOLD = 4;
 /** Game-days at zero food before a captive dies. */
-export const STARVATION_DAYS = 12;
+export const STARVATION_DAYS = 26;
 
 // ── Mood ────────────────────────────────────────────────────────────────────
 
