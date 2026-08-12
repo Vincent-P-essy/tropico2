@@ -138,6 +138,35 @@ way that leaves the mechanic intact:
 4. **No arbitrary campaign locks.** Episodes constrain by resources and time,
    not by hiding the buildings you need to keep anyone happy.
 
+## The people
+
+Everybody on the island is drawn from what the simulation already knows about
+them, in about a dozen filled paths at sixteen pixels tall.
+
+![Every kind of person on the island, drawn at six times scale: three nations, both sexes, ranks from landsman to captain, trades, a wealthy captive and a skeleton](docs/figures.png)
+
+Nationality decides the cloth — crimson and buff for the English, royal blue for
+the French, ochre and blood red for the Spanish — because the original's people
+are English, French or Spanish and it matters whose shipping you are taking. Sex
+decides the silhouette, because half the jobs on this island are open to one sex
+only, exactly as in the original. Rank decides the hat: a landsman has a
+kerchief, a quartermaster a bandana, a senior hand a tricorn, and a captain a
+plume he certainly did not pay for.
+
+What somebody is doing decides how they move. Legs alternate and arms
+counter-swing, offset by the person's own id so a crowd does not march in step.
+A hauler shoulders his load and steadies it with one hand. A brawler swings his
+cutlass. A runner leans into it. A figure walking away from the camera shows you
+his back and no face. And a skeleton — the game has those — is bone, sockets and
+ribs, and hauls without eating.
+
+`npm run figures` draws the whole cast at six times scale, which is the only way
+to tell whether they look like people: at the size they are actually played,
+everything is a silhouette and you cannot see what you have got wrong. It found
+that every figure was wearing the captain's hat, and that the head scarves were
+all the same brown because their colour was indexed off the head's position,
+which never changes.
+
 ## The music
 
 There are no audio files here either. The soundtrack is written a bar at a time
@@ -211,6 +240,7 @@ npm run resume       # plays, saves, reloads the page, and goes back to it
 npm run audio        # renders the music offline and measures the samples
 npm run profile      # times real frames on whatever machine it is run on
 npm run browsers     # runs it in Chrome and in Firefox and checks it drew
+npm run figures      # draws the whole cast at six times scale
 ```
 
 `npm run screenshot` doubles as the end-to-end test: it plays twenty months in
