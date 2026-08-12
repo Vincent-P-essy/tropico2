@@ -3,6 +3,7 @@ import { BUILDINGS, type BuildingId } from "../data/buildings.ts";
 import { anarchyAt, auraAt, auraModifiers, orderAt } from "../sim/auras.ts";
 import type { AuraId } from "../data/needs.ts";
 import { BEACH, DEEP_WATER, SHALLOW_WATER } from "../sim/island.ts";
+import { Ground } from "./ground.ts";
 import type { Building, GameState, Person, Ship } from "../sim/types.ts";
 import type { Camera } from "./camera.ts";
 import {
@@ -45,6 +46,9 @@ interface Drawable {
   draw: () => void;
 }
 
+/** The painted ground, kept between frames. */
+const ground = new Ground();
+
 export function render(
   ctx: CanvasRenderingContext2D,
   state: GameState,
@@ -66,7 +70,9 @@ export function render(
 
   const bounds = camera.visibleTiles(island.width, island.height);
 
-  drawGround(ctx, state, atlas, bounds, time);
+  ground.refresh(state, atlas, drawStaticGround);
+  if (!ground.blit(ctx, camera.worldRect())) drawStaticGround(ctx, state, atlas, bounds);
+  drawShallowWater(ctx, state, ground.shallows(state), bounds, time);
   if (options.overlay && options.overlay !== "none") {
     drawOverlay(ctx, state, bounds, options.overlay);
   }
@@ -107,26 +113,26 @@ function drawSea(ctx: CanvasRenderingContext2D, camera: Camera, time: number): v
   ctx.restore();
 }
 
-function drawGround(
+/**
+ * The part of the ground that never changes: land, cliffs and roads.
+ *
+ * Painted into the cache rather than onto the screen, so its cost is paid when
+ * a road is laid rather than sixty times a second.
+ */
+export function drawStaticGround(
   ctx: CanvasRenderingContext2D,
   state: GameState,
   atlas: SpriteAtlas,
   bounds: { x0: number; y0: number; x1: number; y1: number },
-  time: number,
 ): void {
   const { island } = state;
   for (let y = bounds.y0; y <= bounds.y1; y++) {
     for (let x = bounds.x0; x <= bounds.x1; x++) {
       const type = island.terrain.get(x, y);
-      if (type === DEEP_WATER) continue;
+      if (type === DEEP_WATER || type === SHALLOW_WATER) continue;
 
       const elevation = island.elevation.get(x, y);
       const screen = tileToScreen(x, y, elevation);
-
-      if (type === SHALLOW_WATER) {
-        drawShallows(ctx, screen.x, screen.y, x, y, time);
-        continue;
-      }
 
       const sprite = terrainSprite(atlas, type, x, y);
       ctx.drawImage(sprite.canvas, screen.x - sprite.anchorX, screen.y - sprite.anchorY);
@@ -139,6 +145,22 @@ function drawGround(
         ctx.drawImage(road.canvas, screen.x - road.anchorX, screen.y - road.anchorY);
       }
     }
+  }
+}
+
+/** The half of the ground that moves: the shallows, which shimmer. */
+function drawShallowWater(
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  shallows: readonly { x: number; y: number }[],
+  bounds: { x0: number; y0: number; x1: number; y1: number },
+  time: number,
+): void {
+  for (const tile of shallows) {
+    if (tile.x < bounds.x0 || tile.x > bounds.x1) continue;
+    if (tile.y < bounds.y0 || tile.y > bounds.y1) continue;
+    const screen = tileToScreen(tile.x, tile.y, state.island.elevation.get(tile.x, tile.y));
+    drawShallows(ctx, screen.x, screen.y, tile.x, tile.y, time);
   }
 }
 

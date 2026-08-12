@@ -294,6 +294,14 @@ export interface GameState {
   occupancy: IdField;
   /** 1 where a road has been laid. */
   roads: ByteField;
+  /**
+   * Bumped whenever a road is laid or lifted.
+   *
+   * The renderer paints the ground once and keeps it; this is how it knows the
+   * picture has gone stale. It is not simulation state — nothing reads it but
+   * the drawing — which is why it is a counter and not a set of dirty tiles.
+   */
+  groundVersion: number;
 
   nations: Record<NationId, NationState>;
   regions: Record<RegionId, RegionState>;

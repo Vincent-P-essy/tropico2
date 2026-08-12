@@ -42,6 +42,18 @@ export class Camera {
     this.y += before.y - after.y;
   }
 
+  /** The world-screen rectangle currently on screen. */
+  worldRect(): { left: number; top: number; right: number; bottom: number } {
+    const halfWidth = this.viewWidth / 2 / this.zoom;
+    const halfHeight = this.viewHeight / 2 / this.zoom;
+    return {
+      left: this.x - halfWidth,
+      top: this.y - halfHeight,
+      right: this.x + halfWidth,
+      bottom: this.y + halfHeight,
+    };
+  }
+
   worldToScreen(worldX: number, worldY: number): Point {
     return {
       x: (worldX - this.x) * this.zoom + this.viewWidth / 2,

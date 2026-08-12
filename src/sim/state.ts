@@ -94,6 +94,7 @@ export function createState(options: NewGameOptions): GameState {
     auras: createAuraFields(island),
     occupancy: new IdField(island),
     roads: new ByteField(island),
+    groundVersion: 0,
     nations,
     regions,
     standing: [],
@@ -354,7 +355,10 @@ export function addBuilding(
   forEachTile(building, (tx, ty) => {
     state.occupancy.set(tx, ty, id);
   });
-  if (defId === "road") state.roads.set(x, y, 1);
+  if (defId === "road") {
+    state.roads.set(x, y, 1);
+    state.groundVersion++;
+  }
 
   applyBuildingAuras(state.auras, building, 1);
   return building;
@@ -368,7 +372,10 @@ export function removeBuilding(state: GameState, id: number): boolean {
   forEachTile(building, (tx, ty) => {
     if (state.occupancy.get(tx, ty) === id) state.occupancy.set(tx, ty, -1);
   });
-  if (building.def === "road") state.roads.set(building.x, building.y, 0);
+  if (building.def === "road") {
+    state.roads.set(building.x, building.y, 0);
+    state.groundVersion++;
+  }
 
   for (const workerId of building.workers) {
     const worker = state.people.get(workerId);

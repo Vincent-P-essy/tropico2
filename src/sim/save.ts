@@ -134,6 +134,7 @@ export function deserialize(text: string): GameState {
     effects: saved.effects ?? [],
     marketMarkup: saved.marketMarkup,
     raisings: saved.raisings,
+    groundVersion: 0,
     notices: saved.notices,
     scenario: saved.scenarioId ? (scenarioById(saved.scenarioId) ?? null) : null,
     status: saved.status,
