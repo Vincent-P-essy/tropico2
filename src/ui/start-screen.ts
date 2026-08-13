@@ -129,7 +129,7 @@ export class StartScreen {
     this.root.innerHTML = "";
 
     const title = el("h1");
-    title.textContent = "Tropico 2: Pirate Cove";
+    title.textContent = "The Brethren Coast";
     const blurb = el("p", "tagline");
     blurb.textContent =
       "Your pirates want anarchy. Your captives need order. They live on the same island.";

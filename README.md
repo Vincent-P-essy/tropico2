@@ -1,4 +1,4 @@
-# tropico2
+# The Brethren Coast
 
 > A pirate haven where the pirates want anarchy and the captives need order,
 > and both live on the same island. No install, no assets, no server — the
@@ -9,8 +9,14 @@
 [![TypeScript strict](https://img.shields.io/badge/typescript-strict-blue)](tsconfig.app.json)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-A browser reimplementation of **Tropico 2: Pirate Cove** (Frog City Software, 2003) — the odd one out of the Tropico series, and the only city builder whose
-core loop is managing two populations that want opposite things.
+An isometric city builder set on a buccaneer island in 1650, in the browser,
+with no install and no assets — the whole world is computed from one seed.
+
+It is an independent reimplementation of the systems of _Tropico 2: Pirate Cove_
+(Frog City Software, 2003), which remains the only city builder whose core loop
+is managing two populations that want opposite things. Written from published
+descriptions of how that game worked. Not affiliated with, endorsed by or
+connected to its rights holders, and it contains none of its assets.
 
 ![The game: a pirate settlement on a generated island, with the build menu open and the event log reporting brawls](docs/screenshot.png)
 
@@ -362,6 +368,12 @@ casinos are how the number climbs — and all of them are paid for by going to s
 
 ## Licence
 
-MIT. _Tropico 2: Pirate Cove_ is the work of Frog City Software and PopTop
-Software; this is an independent reimplementation of its systems, written from
-published descriptions of how the game worked, and contains none of its assets.
+The code here is MIT.
+
+_Tropico 2: Pirate Cove_ is the work of Frog City Software and PopTop Software,
+and "Tropico" is a trademark of its current rights holders. This project is an
+independent reimplementation of that game's **systems**, written from published
+descriptions of how it worked. It ships none of its code, art, audio or text, it
+is not affiliated with or endorsed by anyone connected to it, and it is named
+after the Brethren of the Coast — the buccaneer confederation of Tortuga and
+Hispaniola, who are long out of copyright.
