@@ -45,9 +45,10 @@ export function drawPerson(
   state: GameState,
   person: Person,
   time: number,
+  at: { x: number; y: number } = person,
 ): void {
-  const elevation = state.island.elevation.sample(person.x, person.y);
-  const screen = tileToScreen(person.x, person.y, elevation);
+  const elevation = state.island.elevation.sample(at.x, at.y);
+  const screen = tileToScreen(at.x, at.y, elevation);
   const look = appearanceOf(person);
   const pose = poseOf(person, time);
 
@@ -279,13 +280,39 @@ function poseOf(person: Person, time: number): Pose {
 
   const rate = fleeing ? 13 : rioting ? 16 : 8;
   const beat = time * rate + person.id * 1.7;
-  const swing = moving || rioting ? Math.sin(beat) : 0;
+
+  /*
+   * Standing still is not the same as being a statue.
+   *
+   * The only thing that moved was a walk cycle, so anybody not currently on
+   * their way somewhere was frozen mid-stride — and at any moment most of the
+   * island is standing about. It read as a diorama of people rather than as
+   * people. Nobody notices breathing; everybody notices its absence.
+   *
+   * Three slow oscillators, all at different periods and all offset by the
+   * person's own id, so no two are ever in phase: the chest rises, the weight
+   * goes from one foot to the other, and every so often they look the other way.
+   */
+  const own = person.id * 1.31;
+  const breath = Math.sin(time * 1.15 + own) * 0.34;
+  const shift = Math.sin(time * 0.43 + own * 2.1) * 0.55;
+  // A glance is a step function, not a wobble: they look, then they look back.
+  const glance = Math.sin(time * 0.27 + own * 3.7) > 0.82;
+
+  const swing = moving || rioting ? Math.sin(beat) : shift * 0.35;
+  const idleFacing = screenX >= 0 ? 1 : -1;
 
   return {
     swing,
-    lift: moving ? Math.abs(Math.sin(beat)) * 1.4 : 0,
-    lean: fleeing ? 0.16 * (screenX >= 0 ? 1 : -1) : rioting ? Math.sin(beat * 0.7) * 0.09 : 0,
-    facing: screenX >= 0 ? 1 : -1,
+    lift: moving ? Math.abs(Math.sin(beat)) * 1.4 : breath,
+    lean: fleeing
+      ? 0.16 * (screenX >= 0 ? 1 : -1)
+      : rioting
+        ? Math.sin(beat * 0.7) * 0.09
+        : moving
+          ? 0
+          : shift * 0.035,
+    facing: moving ? idleFacing : glance ? -idleFacing : idleFacing,
     away: moving ? screenY < 0 : false,
     work: working ? Math.abs(Math.sin(time * 5 + person.id)) : rioting ? 1 : 0,
     sitting: resting && !moving,

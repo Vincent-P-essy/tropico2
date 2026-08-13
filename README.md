@@ -178,6 +178,36 @@ that every figure was wearing the captain's hat, and that the head scarves were
 all the same brown because their colour was indexed off the head's position,
 which never changes.
 
+### Standing still, and talking
+
+Two things were missing and both of them were the same thing: nobody was alive.
+
+Only a walk cycle moved, so anybody not currently on their way somewhere was
+frozen mid-stride — and at any moment most of an island is standing about. Now
+three slow oscillators run on everyone, all at different periods and all offset
+by the person's own id so no two are ever in step: the chest rises, the weight
+goes from one foot to the other, and every so often they glance the other way.
+Nobody notices breathing. Everybody notices its absence.
+
+And the island _looked_ deserted because it was: of forty-one people alive,
+twenty-five were inside something at any moment and simply were not drawn, so a
+working settlement showed sixteen figures. They now stand at the door of
+whatever they are inside — the simulation still has them indoors, and capacity
+and service are unchanged, but a farm has farmers standing at it.
+
+Then they talk, each in the language they were born to, about whatever is
+happening to them. A starving Spaniard says `Me muero de hambre`; a French
+captive asks `Combien de temps ?`; an English one mutters `Keep your head down`.
+A pirate wanting a drink asks where the rum is, in his own language, and a
+brawler says something you would expect a brawler to say. It is the cheapest
+characterisation there is and it does more for the place than another building
+would.
+
+None of it is simulation state: a line is a pure function of who is speaking and
+what the clock says, so it costs nothing to store, nothing to save, and it can
+never drift out of step with the island it describes. Most people say nothing
+most of the time, on purpose — a screen of bubbles hides the game underneath.
+
 ## The music
 
 There are no audio files here either. The soundtrack is written a bar at a time

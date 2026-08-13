@@ -5,7 +5,8 @@ import type { AuraId } from "../data/needs.ts";
 import { BEACH, DEEP_WATER, SHALLOW_WATER } from "../sim/island.ts";
 import { Ground } from "./ground.ts";
 import { drawPerson } from "./people.ts";
-import type { Building, GameState, Ship } from "../sim/types.ts";
+import { chatterFor } from "./chatter.ts";
+import type { Building, GameState, Person, Ship } from "../sim/types.ts";
 import type { Camera } from "./camera.ts";
 import { alpha, AURA_COLOR, SEA_DEEP, SEA_FOAM, SEA_SHALLOW, shade, UI } from "./palette.ts";
 import { buildingSprite, terrainSprite, type SpriteAtlas } from "./sprites.ts";
@@ -71,6 +72,8 @@ export function render(
   const drawables = collectDrawables(ctx, state, atlas, bounds, options, time);
   drawables.sort((a, b) => a.depth - b.depth);
   for (const item of drawables) item.draw();
+
+  drawChatter(ctx, state, bounds, time);
 
   if (options.ghost) drawGhost(ctx, atlas, options.ghost);
   if (options.hovered) drawTileHighlight(ctx, options.hovered.x, options.hovered.y, UI.gold);
@@ -253,6 +256,110 @@ function drawOverlay(
   ctx.restore();
 }
 
+/**
+ * What everybody is saying, over the top of everything.
+ *
+ * A separate pass rather than part of the figure, because a bubble drawn with
+ * its speaker is covered by whatever is drawn after him — and the one thing a
+ * bubble must not be is behind a roof.
+ */
+function drawChatter(
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  bounds: { x0: number; y0: number; x1: number; y1: number },
+  time: number,
+): void {
+  const speakers: { person: Person; at: { x: number; y: number }; line: string }[] = [];
+
+  for (const person of state.people.values()) {
+    if (person.activity === "dead" || person.activity === "atSea") continue;
+    const host = person.inside >= 0 ? state.buildings.get(person.inside) : undefined;
+    const at = host ? doorwayFor(host, person) : { x: person.x, y: person.y };
+    if (at.x < bounds.x0 || at.x > bounds.x1) continue;
+    if (at.y < bounds.y0 || at.y > bounds.y1) continue;
+
+    // People talk to each other, so somebody alone in a field mostly does not.
+    // Asked lazily: the sweep only runs for the few who have already passed
+    // both the clock and the dice.
+    const line = chatterFor(person, time, () => hasCompany(state, person, at));
+    if (line) speakers.push({ person, at, line });
+  }
+
+  if (speakers.length === 0) return;
+
+  ctx.save();
+  ctx.font = "9px system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  for (const { person, at, line } of speakers) {
+    const elevation = state.island.elevation.sample(at.x, at.y);
+    const screen = tileToScreen(at.x, at.y, elevation);
+    drawBubble(ctx, screen.x, screen.y - 22, line, person.kind === "pirate");
+  }
+  ctx.restore();
+}
+
+/** True when somebody else is close enough to be talking to. */
+function hasCompany(state: GameState, person: Person, at: { x: number; y: number }): boolean {
+  for (const other of state.people.values()) {
+    if (other.id === person.id) continue;
+    if (other.activity === "dead" || other.activity === "atSea") continue;
+    if (other.inside >= 0 && other.inside === person.inside) return true;
+    if (Math.abs(other.x - at.x) <= 2.2 && Math.abs(other.y - at.y) <= 2.2) return true;
+  }
+  return false;
+}
+
+/** One rounded bubble with a tail, sized to its text. */
+function drawBubble(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  text: string,
+  pirate: boolean,
+): void {
+  const width = ctx.measureText(text).width + 8;
+  const height = 13;
+  const left = x - width / 2;
+  const top = y - height;
+
+  ctx.fillStyle = pirate ? "rgba(30, 24, 16, 0.88)" : "rgba(48, 46, 42, 0.86)";
+  ctx.strokeStyle = pirate ? "rgba(214, 168, 78, 0.6)" : "rgba(180, 176, 166, 0.4)";
+  ctx.lineWidth = 0.7;
+
+  ctx.beginPath();
+  ctx.roundRect(left, top, width, height, 3.5);
+  ctx.fill();
+  ctx.stroke();
+
+  // The tail, pointing down at whoever said it.
+  ctx.beginPath();
+  ctx.moveTo(x - 2.4, top + height - 0.4);
+  ctx.lineTo(x, top + height + 3.4);
+  ctx.lineTo(x + 2.4, top + height - 0.4);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = pirate ? "#f0e2c2" : "#ddd9d0";
+  ctx.fillText(text, x, top + height / 2 + 0.5);
+}
+
+/**
+ * Where somebody inside this building stands to be seen.
+ *
+ * Along the south face, spaced by the person's own id so two people in the same
+ * building do not occupy the same spot, and half a tile clear of the wall so
+ * they read as standing at it rather than in it.
+ */
+function doorwayFor(host: Building, person: Person): { x: number; y: number } {
+  const slot = person.id % Math.max(1, host.w);
+  return {
+    x: host.x + slot + 0.5,
+    y: host.y + host.h - 0.35,
+  };
+}
+
 function collectDrawables(
   ctx: CanvasRenderingContext2D,
   state: GameState,
@@ -279,16 +386,29 @@ function collectDrawables(
 
   for (const person of state.people.values()) {
     if (person.activity === "dead" || person.activity === "atSea") continue;
-    if (person.x < bounds.x0 || person.x > bounds.x1) continue;
-    if (person.y < bounds.y0 || person.y > bounds.y1) continue;
-    // Somebody inside a building is not drawn; the building is what you see.
-    if (person.inside >= 0) continue;
 
-    const depth = (person.x + person.y) * 8 + 4;
+    /*
+     * Somebody indoors is drawn at the door rather than not at all.
+     *
+     * Hiding them was defensible and made the island look abandoned: of
+     * forty-one people alive, twenty-five were inside something at any moment,
+     * so a working settlement showed sixteen figures and read as a diorama. The
+     * simulation still has them indoors — capacity, service, all of it is
+     * unchanged — but the picture shows a farm with farmers standing at it and a
+     * tavern with somebody outside the door, which is what a busy island looks
+     * like.
+     */
+    const host = person.inside >= 0 ? state.buildings.get(person.inside) : undefined;
+    const at = host ? doorwayFor(host, person) : { x: person.x, y: person.y };
+
+    if (at.x < bounds.x0 || at.x > bounds.x1) continue;
+    if (at.y < bounds.y0 || at.y > bounds.y1) continue;
+
+    const depth = (at.x + at.y) * 8 + (host ? 5 : 4);
     out.push({
       depth,
       draw: () => {
-        drawPerson(ctx, state, person, time);
+        drawPerson(ctx, state, person, time, at);
       },
     });
   }
