@@ -14,6 +14,55 @@ alongside an explicit statement of non-affiliation. Keep it that way.
 
 Live at `vincent-p-essy.github.io/tropico2/` · repo `Vincent-P-essy/tropico2`.
 
+---
+
+## Status — 13 August 2026 · `20c869c` · 78 commits
+
+**Green.** CI and Deploy both pass, 406 tests, Chrome and Firefox both render,
+the deployed page has been checked and works. Working tree clean, nothing
+unpushed. Vincent plays it at `vincent-p-essy.github.io/tropico2/`.
+
+Keep this section true. It is the first thing read in a fresh session and the
+whole reason that session does not have to go and find out for itself. Update it
+whenever something lands, and be honest in it — a status report that flatters is
+worse than none.
+
+### Standing
+
+The game is feature-complete against the original's systems: 65 buildings, 33
+edicts, 16 campaign episodes with their published resources and medal times, 16
+named captains, three nations, ships and cruising, invasions, ranks, saving and
+resuming, a synthesised soundtrack, and speech in three languages.
+
+### In flight
+
+Nothing. The last session closed clean.
+
+### Next, in the order it is worth doing
+
+1. **Pirate happiness** — see the open problem below. It is the one number that
+   is visibly wrong against the original and it needs the opening settlement
+   right-sized, not added to.
+2. **The player has no idea what to do first.** There is no tutorial and no
+   prompting. The original's episode 1 marked the ground where buildings went.
+   The single most valuable thing after happiness.
+3. **Ship combat is resolved out of sight.** A cruise returns a number. The
+   original showed you the engagement and let you choose to board, pound or
+   harass — the choice exists in the data and is never surfaced.
+4. **Chatter could react to events**, not only to state: a prize coming home, an
+   invasion sighted, a building finished.
+
+### Recently done, so it is not done twice
+
+Starting ship, captain and dock; guaranteed food and lumber chains; the famine
+and the collapse it caused; invasions actually being called; save _and_ load;
+the ground cache and adaptive resolution; the whole cast redrawn with
+nationality, sex, rank and the pirate kit; idle animation; people drawn at the
+doors of buildings they are inside; the phrasebook; the rename off the
+trademark.
+
+---
+
 ## Read this first, then only what you need
 
 70 source files, ~24k lines. Do not read the tree to orient yourself — this file
@@ -116,6 +165,20 @@ entertainment, and housing quality — which caps resting and stashing — rises
 with rank, which rises only with plunder. Adding better buildings destabilises
 the food chain. This is the first thing to fix, and it needs the settlement
 right-sized rather than added to.
+
+## Keeping this file useful
+
+It is loaded automatically at the start of every session and then sits in
+context — it is not re-read per message, and it should not be: re-reading costs
+tokens rather than saving them. What saves tokens is that a session which starts
+here does not have to go and rediscover the state of the project.
+
+So the deal is: **update the status section as part of the work, not after it.**
+When something lands, move it from "in flight" to "recently done" in the same
+commit. When a session ends, leave the status true. A fresh session that trusts
+this file and finds it stale is worse off than one that trusts nothing.
+
+Vincent can add a line to it from the prompt by starting a message with `#`.
 
 ## Fidelity
 
