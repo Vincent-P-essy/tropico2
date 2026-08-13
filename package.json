@@ -19,7 +19,8 @@
     "audio": "node scripts/audio.mjs",
     "profile": "node scripts/profile.mjs",
     "browsers": "node scripts/browsers.mjs",
-    "figures": "node scripts/figures.mjs"
+    "figures": "node scripts/figures.mjs",
+    "playtest": "node scripts/playtest.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

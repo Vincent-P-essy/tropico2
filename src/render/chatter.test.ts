@@ -19,9 +19,14 @@ function someone(over: Partial<Person> = {}): Person {
   return { ...template, ...over } as Person;
 }
 
-/** Letters that only appear in one of the three languages. */
-const FRENCH = /[éèêàçûôîœ]|\bde\b|\bje\b|\bne\b|\bpas\b|\bà\b/i;
-const SPANISH = /[¿¡ñáíóú]|\bque\b|\bno\b|\bme\b/i;
+/**
+ * Marks that belong to Spanish and to no other language here.
+ *
+ * "me" and "no" were on this list once, and both are perfectly good English
+ * words — the test failed on "You owe me a drink." and the phrasebook was
+ * innocent. Only punctuation, accents and words with no English twin count.
+ */
+const SPANISH = /[¿¡ñáíóú]|\bque\b|\bcomo\b|\bpara\b|\bmuy\b/i;
 
 describe("what people say", () => {
   it("says it in the language they were born to", () => {
@@ -40,18 +45,34 @@ describe("what people say", () => {
     expect(lines.france.length).toBeGreaterThan(20);
     expect(lines.spain.length).toBeGreaterThan(20);
 
-    // No Spanish punctuation in an Englishman's mouth, and no French accents.
+    // Nothing foreign in an Englishman's mouth. Exact, and it catches a line
+    // filed under the wrong flag.
     for (const line of lines.england) {
       expect(line, `English said: ${line}`).not.toMatch(SPANISH);
-      expect(line, `English said: ${line}`).not.toMatch(/[éèêàçûôî]/);
+      expect(line, `English said: ${line}`).not.toMatch(/[éèêàçûôîñáíóú¿¡]/);
     }
-    // And the other two are recognisably themselves at least most of the time.
-    expect(lines.france.filter((l) => FRENCH.test(l)).length / lines.france.length).toBeGreaterThan(
-      0.5,
-    );
-    expect(lines.spain.filter((l) => SPANISH.test(l)).length / lines.spain.length).toBeGreaterThan(
-      0.5,
-    );
+
+    /*
+     * And no two nations share a sentence.
+     *
+     * This is the property that actually matters, and counting how many lines
+     * carry an accent is not: "Alors ?" and "Au travail." are unmistakably
+     * French and contain nothing a regular expression can see, so a threshold
+     * on diacritics measures how short the phrasebook's sentences are rather
+     * than what language they are in.
+     */
+    const english = new Set(lines.england);
+    for (const line of [...lines.france, ...lines.spain]) {
+      expect(english.has(line), `both English and foreign: ${line}`).toBe(false);
+    }
+    const french = new Set(lines.france);
+    for (const line of lines.spain) {
+      expect(french.has(line), `both French and Spanish: ${line}`).toBe(false);
+    }
+
+    // The two that have accents at all do use them.
+    expect(lines.france.some((l) => /[éèêàçûôî]/.test(l))).toBe(true);
+    expect(lines.spain.some((l) => /[¿¡ñáíóú]/.test(l))).toBe(true);
   });
 
   it("says the same thing at the same moment, every time", () => {
