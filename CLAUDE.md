@@ -99,6 +99,10 @@ Everything below was a real bug that cost hours. Do not reintroduce them.
   NaN and silently took every other instrument with it. A `let` read before its
   declaration blanked the page in Firefox while Chrome, on a cached bundle, said
   nothing.
+- **Throwaway scripts go in the scratchpad, never the repo root.** One got
+  committed by `git add -A` because the `rm` that would have deleted it was on
+  the tail of a command that timed out, and CI failed on a file that was never
+  meant to exist.
 - **Judge art at 6×.** At sixteen pixels everything is a silhouette. The contact
   sheet found that every figure wore the captain's hat and every head scarf was
   the same brown.
